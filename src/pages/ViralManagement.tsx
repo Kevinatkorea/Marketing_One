@@ -113,7 +113,7 @@ export default function ViralManagement() {
   return (
     <div className="space-y-6">
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-4">
         <StatCard
           title="총 바이럴"
           value={`${stats?.totalVirals ?? 0}건`}
@@ -157,17 +157,17 @@ export default function ViralManagement() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Donut Chart */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5">
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">검증결과 분포</h3>
           {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
                   data={pieData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
+                  innerRadius={40}
+                  outerRadius={70}
                   paddingAngle={3}
                   dataKey="value"
                   stroke="none"
@@ -202,11 +202,11 @@ export default function ViralManagement() {
         </div>
 
         {/* Bar Chart */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5">
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">부적합 원인 분석</h3>
           {barData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={barData} layout="vertical" margin={{ left: 20 }}>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={barData} layout="vertical" margin={{ left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
                 <XAxis type="number" tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} />
                 <YAxis
@@ -215,7 +215,7 @@ export default function ViralManagement() {
                   tick={{ fill: '#a1a1aa', fontSize: 12 }}
                   axisLine={false}
                   tickLine={false}
-                  width={90}
+                  width={70}
                 />
                 <Tooltip
                   contentStyle={{
@@ -240,9 +240,9 @@ export default function ViralManagement() {
       {/* Viral List Table */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg">
         {/* Table Header / Filters */}
-        <div className="px-5 py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-sm font-semibold text-zinc-200">바이럴 목록</h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {(
               [
                 { key: 'all', label: '전체' },
@@ -255,7 +255,7 @@ export default function ViralManagement() {
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                className={`text-xs px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-lg font-medium transition-colors min-h-[36px] ${
                   filter === f.key
                     ? 'bg-blue-600/15 text-blue-400'
                     : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
@@ -269,15 +269,15 @@ export default function ViralManagement() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs sm:text-sm">
             <thead>
               <tr className="border-b border-zinc-800">
-                <th className="text-left py-3 px-5 text-zinc-500 font-medium">제목</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">플랫폼</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">작성자</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">상태</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">부정댓글</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">등록일</th>
+                <th className="text-left py-3 px-3 sm:px-5 text-zinc-500 font-medium">제목</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">플랫폼</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden md:table-cell">작성자</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">상태</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">부정댓글</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">등록일</th>
               </tr>
             </thead>
             <tbody>
@@ -287,15 +287,15 @@ export default function ViralManagement() {
                   className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors cursor-pointer"
                   onClick={() => navigate(`/projects/${id}/viral/${viral.id}`)}
                 >
-                  <td className="py-3 px-5 text-zinc-200 font-medium max-w-xs truncate">
+                  <td className="py-3 px-3 sm:px-5 text-zinc-200 font-medium max-w-[140px] sm:max-w-xs truncate">
                     {viral.title}
                   </td>
-                  <td className="py-3 px-4 text-zinc-400">{viral.platform}</td>
-                  <td className="py-3 px-4 text-zinc-400">{viral.author}</td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden sm:table-cell">{viral.platform}</td>
+                  <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden md:table-cell">{viral.author}</td>
+                  <td className="py-3 px-2 sm:px-4">
                     {statusBadge(viral.status, viral.verification.result)}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-2 sm:px-4">
                     <span
                       className={
                         viral.comments.negativeCount > 0 ? 'text-red-400' : 'text-zinc-600'
@@ -304,7 +304,7 @@ export default function ViralManagement() {
                       {viral.comments.negativeCount}건
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-zinc-500">
+                  <td className="py-3 px-2 sm:px-4 text-zinc-500 hidden sm:table-cell">
                     {new Date(viral.createdAt).toLocaleDateString('ko-KR')}
                   </td>
                 </tr>

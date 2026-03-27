@@ -156,7 +156,7 @@ export default function BulkRegistration() {
       )}
 
       {/* Tab Content */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 sm:p-6">
         {activeTab === 'paste' ? (
           <div className="space-y-4">
             <label className="block">
@@ -166,7 +166,7 @@ export default function BulkRegistration() {
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                className="mt-2 w-full h-48 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                className="mt-2 w-full h-32 sm:h-48 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
                 placeholder={
                   '서초맘모여라\n나이드니까 옷핏이 별루에요\nhttps://cafe.naver.com/cafeseochomoms/112637\n\n행복한여왕\n뒷모습 더 스트레스면 뭐부터 해야 하나요\nhttps://cafe.naver.com/playtomato/1277393'
                 }
@@ -205,7 +205,7 @@ export default function BulkRegistration() {
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleFileDrop}
-              className="border-2 border-dashed border-zinc-700 rounded-lg p-12 text-center hover:border-zinc-600 transition-colors cursor-pointer"
+              className="border-2 border-dashed border-zinc-700 rounded-lg p-6 sm:p-12 text-center hover:border-zinc-600 transition-colors cursor-pointer"
             >
               {selectedFile ? (
                 <>

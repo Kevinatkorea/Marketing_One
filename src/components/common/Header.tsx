@@ -15,7 +15,6 @@ export default function Header() {
   const navigate = useNavigate();
   const { currentProject, projects, setCurrentProject } = useProjectStore();
 
-  // Build breadcrumbs from path
   const pathSegments = location.pathname
     .replace(`/projects/${id}/`, '')
     .split('/')
@@ -37,9 +36,9 @@ export default function Header() {
   };
 
   return (
-    <header className="h-16 bg-zinc-900/80 backdrop-blur-sm border-b border-zinc-800 flex items-center justify-between px-6 shrink-0">
+    <header className="h-14 sm:h-16 bg-zinc-900/80 backdrop-blur-sm border-b border-zinc-800 flex items-center justify-between px-3 sm:px-6 shrink-0">
       {/* Left: Breadcrumbs */}
-      <div className="flex items-center gap-2 text-sm min-w-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm min-w-0 overflow-x-auto">
         <Link
           to={`/projects/${id}/dashboard`}
           className="text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"
@@ -47,10 +46,10 @@ export default function Header() {
           {currentProject?.name || '프로젝트'}
         </Link>
         {breadcrumbs.map((crumb) => (
-          <span key={crumb.path} className="flex items-center gap-2 min-w-0">
+          <span key={crumb.path} className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <svg
-              width="16"
-              height="16"
+              width="14"
+              height="14"
               viewBox="0 0 16 16"
               fill="none"
               className="text-zinc-600 shrink-0"
@@ -74,11 +73,11 @@ export default function Header() {
       </div>
 
       {/* Right: Project selector */}
-      <div className="flex items-center gap-4 shrink-0">
+      <div className="flex items-center shrink-0 ml-2">
         <select
           value={currentProject?.id || ''}
           onChange={handleProjectChange}
-          className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs sm:text-sm rounded-lg px-2 sm:px-3 py-2 min-h-[44px] focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[120px] sm:max-w-none"
         >
           {projects.map((project) => (
             <option key={project.id} value={project.id}>

@@ -89,7 +89,7 @@ export default function ViralDetail() {
       </Link>
 
       {/* Viral Info */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 sm:p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-lg font-bold text-zinc-100">{viral.title}</h1>
@@ -106,7 +106,7 @@ export default function ViralDetail() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm">
           <div>
             <span className="text-zinc-500">플랫폼</span>
             <p className="text-zinc-200 mt-0.5">{viral.platform}</p>
@@ -127,7 +127,7 @@ export default function ViralDetail() {
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-zinc-800 flex items-center justify-between">
+        <div className="mt-4 pt-4 border-t border-zinc-800 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
           <a
             href={viral.url}
             target="_blank"
@@ -139,7 +139,7 @@ export default function ViralDetail() {
           <button
             onClick={handleVerify}
             disabled={verifying}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
+            className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors min-h-[44px] self-start sm:self-auto"
           >
             {verifying ? '검증 중...' : '재검증'}
           </button>
@@ -147,7 +147,7 @@ export default function ViralDetail() {
       </div>
 
       {/* Verification Result */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-zinc-200">검증 결과</h2>
           <div className="flex items-center gap-3 text-sm">
@@ -213,7 +213,7 @@ export default function ViralDetail() {
 
       {/* Verification History */}
       {viral.verificationHistory.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 sm:p-6">
           <h2 className="text-base font-semibold text-zinc-200 mb-4">검증 이력</h2>
           <div className="space-y-2">
             {viral.verificationHistory.map((entry, i) => (
@@ -234,7 +234,7 @@ export default function ViralDetail() {
       )}
 
       {/* Comments */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 sm:p-6">
         <h2 className="text-base font-semibold text-zinc-200 mb-4">
           댓글 ({comments.length})
           {viral.comments.negativeCount > 0 && (

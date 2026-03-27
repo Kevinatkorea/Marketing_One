@@ -13,7 +13,9 @@
       "Bash(vercel logs:*)",
       "Bash(python3 -c \":*)",
       "Bash(git mv:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''Total: {d[\"\"total\"\"]}, Page: {d[\"\"page\"\"]}, Data count: {len\\(d[\"\"data\"\"]\\)}''''\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2, ensure_ascii=False\\)\\)\")"
     ]
   }
 }

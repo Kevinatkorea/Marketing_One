@@ -101,9 +101,9 @@ export default function GuideManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-zinc-100">가이드 관리</h1>
+          <h1 className="text-lg sm:text-xl font-bold text-zinc-100">가이드 관리</h1>
           <p className="text-sm text-zinc-500 mt-1">바이럴 검증 가이드를 관리합니다</p>
         </div>
         <button
@@ -120,15 +120,15 @@ export default function GuideManagement() {
       {/* Guide List */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs sm:text-sm">
             <thead>
               <tr className="border-b border-zinc-800">
-                <th className="text-left py-3 px-5 text-zinc-500 font-medium">가이드명</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">상품</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">버전</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">검증 규칙</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">상태</th>
-                <th className="text-left py-3 px-4 text-zinc-500 font-medium">수정일</th>
+                <th className="text-left py-3 px-3 sm:px-5 text-zinc-500 font-medium">가이드명</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">상품</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden md:table-cell">버전</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">규칙</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">상태</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">수정일</th>
               </tr>
             </thead>
             <tbody>
@@ -144,12 +144,12 @@ export default function GuideManagement() {
                     key={guide.id}
                     className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
                   >
-                    <td className="py-3 px-5 text-zinc-200 font-medium">
+                    <td className="py-3 px-3 sm:px-5 text-zinc-200 font-medium max-w-[140px] sm:max-w-none truncate">
                       {guide.customGuidelines || guide.id}
                     </td>
-                    <td className="py-3 px-4 text-zinc-400">{productName(guide.productId)}</td>
-                    <td className="py-3 px-4 text-zinc-400">v{guide.version}</td>
-                    <td className="py-3 px-4 text-zinc-400">
+                    <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden sm:table-cell">{productName(guide.productId)}</td>
+                    <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden md:table-cell">v{guide.version}</td>
+                    <td className="py-3 px-2 sm:px-4 text-zinc-400">
                       {guide.verificationRules.length}개
                     </td>
                     <td className="py-3 px-4">
@@ -163,7 +163,7 @@ export default function GuideManagement() {
                         {guide.isTemplate ? '템플릿' : '활성'}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-zinc-500">
+                    <td className="py-3 px-2 sm:px-4 text-zinc-500 hidden sm:table-cell">
                       {new Date(guide.updatedAt).toLocaleDateString('ko-KR')}
                     </td>
                   </tr>
@@ -177,7 +177,7 @@ export default function GuideManagement() {
       {/* Create Guide Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowModal(false)}>
-          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 sm:p-6 w-full max-w-lg mx-3 sm:mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-zinc-100 mb-4">가이드 등록</h2>
 
             {error && (
@@ -187,7 +187,7 @@ export default function GuideManagement() {
             )}
 
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-sm text-zinc-400">상품 선택 *</span>
                   <select

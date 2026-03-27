@@ -46,25 +46,25 @@ export default function StatCard({
   icon,
 }: StatCardProps) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5 flex flex-col gap-3">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5 flex flex-col gap-2 sm:gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-zinc-400 font-medium">{title}</span>
+        <span className="text-xs sm:text-sm text-zinc-400 font-medium">{title}</span>
         {icon && (
           <span
-            className={`w-8 h-8 rounded-lg ${bgColorMap[color]} flex items-center justify-center text-base`}
+            className={`w-6 h-6 sm:w-8 sm:h-8 rounded-lg ${bgColorMap[color]} flex items-center justify-center text-sm sm:text-base`}
           >
             {icon}
           </span>
         )}
       </div>
       <div className="flex items-end gap-2">
-        <span className={`text-2xl font-bold ${colorMap[color]}`}>
+        <span className={`text-lg sm:text-2xl font-bold ${colorMap[color]}`}>
           {value}
         </span>
         {trend && trendIcons[trend]}
       </div>
       {subtitle && (
-        <span className="text-xs text-zinc-500">{subtitle}</span>
+        <span className="text-[10px] sm:text-xs text-zinc-500 leading-tight">{subtitle}</span>
       )}
     </div>
   );
