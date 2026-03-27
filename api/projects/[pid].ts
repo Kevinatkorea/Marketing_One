@@ -13,7 +13,7 @@ import {
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const id = getPathParam(request, 'id');
+    const id = getPathParam(request, 'pid');
     if (!id) return errorResponse('Project ID is required', 400);
 
     const project = await projectRepo.findById(id);
@@ -30,7 +30,7 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function PUT(request: Request): Promise<Response> {
   try {
-    const id = getPathParam(request, 'id');
+    const id = getPathParam(request, 'pid');
     if (!id) return errorResponse('Project ID is required', 400);
 
     const body = await parseBody(request);
@@ -54,7 +54,7 @@ export async function PUT(request: Request): Promise<Response> {
 
 export async function DELETE(request: Request): Promise<Response> {
   try {
-    const id = getPathParam(request, 'id');
+    const id = getPathParam(request, 'pid');
     if (!id) return errorResponse('Project ID is required', 400);
 
     const existing = await projectRepo.findById(id);
