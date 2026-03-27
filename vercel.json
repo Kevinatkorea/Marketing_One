@@ -2,8 +2,17 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "functions": {
+    "api/**/*.ts": {
+      "memory": 256,
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/api/health", "destination": "/api/health" },
+    { "source": "/api/projects", "destination": "/api/projects/index" },
+    { "source": "/api/projects/:pid", "destination": "/api/projects/[pid]/[[...path]]" },
+    { "source": "/api/projects/:pid/:path*", "destination": "/api/projects/[pid]/[[...path]]" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
