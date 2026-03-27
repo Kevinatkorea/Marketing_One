@@ -1,0 +1,310 @@
+{
+  "projects": [
+    {
+      "id": "proj_001",
+      "name": "2026 봄 신상품 런칭",
+      "description": "2026년 봄 시즌 신규 스킨케어 라인 런칭 바이럴 마케팅 캠페인. 네이버카페 및 블로그 중심의 체험단 리뷰 및 자연스러운 입소문 마케팅을 진행합니다.",
+      "createdAt": "2026-02-15T09:00:00.000Z",
+      "updatedAt": "2026-03-20T14:30:00.000Z",
+      "status": "active",
+      "owner": "김마케팅"
+    }
+  ],
+  "products": [
+    {
+      "id": "prod_001",
+      "projectId": "proj_001",
+      "name": "스프링 모이스처 크림",
+      "category": "스킨케어",
+      "description": "봄철 건조한 피부를 위한 고보습 수분크림. 히알루론산과 세라마이드 함유로 24시간 보습 지속. 민감성 피부도 사용 가능한 저자극 포뮬러.",
+      "campaignPeriod": {
+        "startDate": "2026-03-01",
+        "endDate": "2026-04-30",
+        "status": "active"
+      },
+      "createdAt": "2026-02-20T10:00:00.000Z"
+    },
+    {
+      "id": "prod_002",
+      "projectId": "proj_001",
+      "name": "비타민 세럼",
+      "category": "스킨케어",
+      "description": "순수 비타민C 15% 함유 고농축 세럼. 톤업과 잡티 케어에 효과적. 안정화 비타민C 기술로 산화 걱정 없이 사용 가능.",
+      "campaignPeriod": {
+        "startDate": "2026-04-01",
+        "endDate": "2026-05-31",
+        "status": "upcoming"
+      },
+      "createdAt": "2026-02-20T10:30:00.000Z"
+    }
+  ],
+  "guides": [
+    {
+      "id": "guide_001",
+      "projectId": "proj_001",
+      "productId": "prod_001",
+      "version": "1.0",
+      "verificationRules": [
+        {
+          "ruleId": "required_keywords",
+          "name": "필수 키워드 포함",
+          "weight": 30,
+          "isAutoFail": false,
+          "config": {
+            "keywords": ["스프링 모이스처 크림", "수분크림", "보습"],
+            "minCount": 2,
+            "description": "필수 키워드 중 최소 2개 이상 포함되어야 합니다."
+          }
+        },
+        {
+          "ruleId": "forbidden_keywords",
+          "name": "금지 키워드 검사",
+          "weight": 20,
+          "isAutoFail": true,
+          "config": {
+            "keywords": ["최저가", "할인코드", "파격세일", "경쟁사명", "부작용"],
+            "description": "금지된 표현이 포함되면 자동 실패 처리됩니다."
+          }
+        },
+        {
+          "ruleId": "tone_check",
+          "name": "톤앤매너 검사",
+          "weight": 20,
+          "isAutoFail": false,
+          "config": {
+            "tone": "natural",
+            "avoidPatterns": ["광고", "협찬", "제공받아"],
+            "description": "자연스러운 후기 톤으로 작성되었는지 확인합니다. 광고성 표현은 감점됩니다."
+          }
+        },
+        {
+          "ruleId": "content_structure",
+          "name": "콘텐츠 구조 검사",
+          "weight": 15,
+          "isAutoFail": false,
+          "config": {
+            "minLength": 500,
+            "maxLength": 3000,
+            "requireImage": true,
+            "minImageCount": 3,
+            "description": "최소 500자 이상, 이미지 3장 이상 포함되어야 합니다."
+          }
+        },
+        {
+          "ruleId": "naver_policy",
+          "name": "네이버 정책 준수",
+          "weight": 15,
+          "isAutoFail": true,
+          "config": {
+            "checkDuplicateContent": true,
+            "checkExternalLinks": true,
+            "maxExternalLinks": 1,
+            "description": "네이버 카페 운영 정책 위반 여부를 검사합니다. 위반 시 자동 실패."
+          }
+        }
+      ],
+      "customGuidelines": "1. 실제 사용 후기처럼 자연스럽게 작성\n2. 사용 전/후 비교 사진 필수 포함\n3. 구매 링크는 카페 공동구매 게시판 링크만 허용\n4. 타 브랜드 비교는 긍정적 뉘앙스로만 허용\n5. 민감성 피부 사용 후기인 경우 피부 타입 언급 필수",
+      "isTemplate": false,
+      "createdAt": "2026-02-25T11:00:00.000Z",
+      "updatedAt": "2026-03-15T16:00:00.000Z"
+    }
+  ],
+  "virals": [
+    {
+      "id": "viral_001",
+      "projectId": "proj_001",
+      "productId": "prod_001",
+      "guideId": "guide_001",
+      "title": "건조한 봄철 피부 구원템 찾았어요! 스프링 모이스처 크림 솔직 후기",
+      "url": "https://cafe.naver.com/beautytalk/123456",
+      "platform": "네이버카페",
+      "cafeName": "뷰티톡",
+      "author": "피부좋아지고싶은사람",
+      "batchId": "batch_001",
+      "status": "verified",
+      "verification": {
+        "result": "ok",
+        "score": 92,
+        "grade": "green",
+        "checkedAt": "2026-03-20T10:00:00.000Z",
+        "details": [
+          { "ruleId": "required_keywords", "passed": true, "score": 28, "note": "필수 키워드 3개 모두 포함" },
+          { "ruleId": "forbidden_keywords", "passed": true, "score": 20, "note": "금지 키워드 없음" },
+          { "ruleId": "tone_check", "passed": true, "score": 18, "note": "자연스러운 후기 톤 확인" },
+          { "ruleId": "content_structure", "passed": true, "score": 14, "note": "1200자, 이미지 5장 포함" },
+          { "ruleId": "naver_policy", "passed": true, "score": 12, "note": "정책 위반 없음" }
+        ],
+        "issues": []
+      },
+      "verificationHistory": [
+        { "attempt": 1, "result": "ok", "score": 92, "verifiedAt": "2026-03-20T10:00:00.000Z" }
+      ],
+      "comments": {
+        "totalCount": 8,
+        "negativeCount": 0,
+        "lastCheckedAt": "2026-03-25T09:00:00.000Z"
+      },
+      "createdAt": "2026-03-18T14:00:00.000Z"
+    },
+    {
+      "id": "viral_002",
+      "projectId": "proj_001",
+      "productId": "prod_001",
+      "guideId": "guide_001",
+      "title": "수분크림 추천! 요즘 매일 바르는 크림 소개합니다",
+      "url": "https://cafe.naver.com/skincare/789012",
+      "platform": "네이버카페",
+      "cafeName": "스킨케어매니아",
+      "author": "데일리뷰티",
+      "batchId": "batch_001",
+      "status": "verified",
+      "verification": {
+        "result": "warning",
+        "score": 72,
+        "grade": "yellow",
+        "checkedAt": "2026-03-20T10:05:00.000Z",
+        "details": [
+          { "ruleId": "required_keywords", "passed": true, "score": 25, "note": "필수 키워드 2개 포함" },
+          { "ruleId": "forbidden_keywords", "passed": true, "score": 20, "note": "금지 키워드 없음" },
+          { "ruleId": "tone_check", "passed": false, "score": 10, "note": "'협찬' 유사 표현 감지: '제품을 받아서'" },
+          { "ruleId": "content_structure", "passed": true, "score": 12, "note": "800자, 이미지 3장 포함" },
+          { "ruleId": "naver_policy", "passed": true, "score": 5, "note": "외부 링크 1개 감지 (허용 범위)" }
+        ],
+        "issues": ["톤앤매너 주의: 광고성 표현 감지", "외부 링크 수 확인 필요"]
+      },
+      "verificationHistory": [
+        { "attempt": 1, "result": "warning", "score": 72, "verifiedAt": "2026-03-20T10:05:00.000Z" }
+      ],
+      "comments": {
+        "totalCount": 12,
+        "negativeCount": 2,
+        "lastCheckedAt": "2026-03-25T09:00:00.000Z"
+      },
+      "createdAt": "2026-03-18T15:00:00.000Z"
+    },
+    {
+      "id": "viral_003",
+      "projectId": "proj_001",
+      "productId": "prod_001",
+      "guideId": "guide_001",
+      "title": "이거 진짜 최저가! 스프링 모이스처 크림 할인 정보",
+      "url": "https://cafe.naver.com/beautydeals/345678",
+      "platform": "네이버카페",
+      "cafeName": "뷰티핫딜",
+      "author": "핫딜헌터",
+      "batchId": "batch_001",
+      "status": "failed",
+      "verification": {
+        "result": "fail",
+        "score": 25,
+        "grade": "red",
+        "checkedAt": "2026-03-20T10:10:00.000Z",
+        "details": [
+          { "ruleId": "required_keywords", "passed": true, "score": 20, "note": "필수 키워드 2개 포함" },
+          { "ruleId": "forbidden_keywords", "passed": false, "score": 0, "note": "금지 키워드 발견: '최저가', '할인코드'" },
+          { "ruleId": "tone_check", "passed": false, "score": 5, "note": "광고성 톤 감지" },
+          { "ruleId": "content_structure", "passed": false, "score": 0, "note": "본문 320자로 최소 기준 미달, 이미지 1장" },
+          { "ruleId": "naver_policy", "passed": false, "score": 0, "note": "외부 링크 3개 감지, 정책 위반" }
+        ],
+        "issues": [
+          "자동 실패: 금지 키워드 포함 ('최저가', '할인코드')",
+          "자동 실패: 네이버 정책 위반 (외부 링크 초과)",
+          "콘텐츠 길이 부족 (320/500자)",
+          "이미지 수 부족 (1/3장)"
+        ]
+      },
+      "verificationHistory": [
+        { "attempt": 1, "result": "fail", "score": 25, "verifiedAt": "2026-03-20T10:10:00.000Z" }
+      ],
+      "comments": {
+        "totalCount": 3,
+        "negativeCount": 2,
+        "lastCheckedAt": "2026-03-25T09:00:00.000Z"
+      },
+      "createdAt": "2026-03-18T16:00:00.000Z"
+    }
+  ],
+  "comments": [
+    {
+      "id": "cmt_001",
+      "viralId": "viral_001",
+      "author": "뷰티러버88",
+      "content": "저도 이거 써봤는데 진짜 보습력 좋아요! 건조한 피부에 딱이에요.",
+      "sentiment": "positive",
+      "sentimentScore": 0.85,
+      "isNegative": false,
+      "category": "genuine_review",
+      "priority": "ignore",
+      "responseRequired": false,
+      "responses": [],
+      "detectedAt": "2026-03-21T08:00:00.000Z",
+      "originalDate": "2026-03-20T15:30:00.000Z"
+    },
+    {
+      "id": "cmt_002",
+      "viralId": "viral_001",
+      "author": "스킨케어초보",
+      "content": "가격이 어떻게 되나요? 어디서 살 수 있어요?",
+      "sentiment": "neutral",
+      "sentimentScore": 0.0,
+      "isNegative": false,
+      "category": "inquiry",
+      "priority": "monitor",
+      "responseRequired": true,
+      "responses": [
+        {
+          "responder": "피부좋아지고싶은사람",
+          "content": "공동구매 게시판에 링크 있어요! 확인해보세요~",
+          "respondedAt": "2026-03-20T18:00:00.000Z"
+        }
+      ],
+      "detectedAt": "2026-03-21T08:00:00.000Z",
+      "originalDate": "2026-03-20T16:00:00.000Z"
+    },
+    {
+      "id": "cmt_003",
+      "viralId": "viral_002",
+      "author": "진실의입",
+      "content": "이거 광고 아닌가요? 너무 광고 같은데...",
+      "sentiment": "negative",
+      "sentimentScore": -0.7,
+      "isNegative": true,
+      "category": "ad_accusation",
+      "priority": "immediate",
+      "responseRequired": true,
+      "responses": [],
+      "detectedAt": "2026-03-22T09:00:00.000Z",
+      "originalDate": "2026-03-21T11:00:00.000Z"
+    },
+    {
+      "id": "cmt_004",
+      "viralId": "viral_002",
+      "author": "화장품박사",
+      "content": "성분표 보니까 괜찮은 것 같아요. 세라마이드 함량이 높네요.",
+      "sentiment": "positive",
+      "sentimentScore": 0.6,
+      "isNegative": false,
+      "category": "genuine_review",
+      "priority": "ignore",
+      "responseRequired": false,
+      "responses": [],
+      "detectedAt": "2026-03-22T09:00:00.000Z",
+      "originalDate": "2026-03-21T14:00:00.000Z"
+    },
+    {
+      "id": "cmt_005",
+      "viralId": "viral_003",
+      "author": "소비자보호",
+      "content": "이런 글은 신고해야 합니다. 명백한 광고성 게시물이에요. 카페 규정 위반입니다.",
+      "sentiment": "negative",
+      "sentimentScore": -0.9,
+      "isNegative": true,
+      "category": "complaint",
+      "priority": "immediate",
+      "responseRequired": true,
+      "responses": [],
+      "detectedAt": "2026-03-22T10:00:00.000Z",
+      "originalDate": "2026-03-21T09:00:00.000Z"
+    }
+  ]
+}

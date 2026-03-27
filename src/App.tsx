@@ -1,21 +1,51 @@
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import Layout from './components/common/Layout';
+import ProjectList from './pages/ProjectList';
+import ProjectDashboard from './pages/ProjectDashboard';
+import ViralManagement from './pages/ViralManagement';
+import GuideManagement from './pages/GuideManagement';
+import BulkRegistration from './pages/BulkRegistration';
+import ViralDetail from './pages/ViralDetail';
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <ProjectList />,
+  },
+  {
+    path: '/projects/:id',
+    element: <Layout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="viral" replace />,
+      },
+      {
+        path: 'dashboard',
+        element: <ProjectDashboard />,
+      },
+      {
+        path: 'viral',
+        element: <ViralManagement />,
+      },
+      {
+        path: 'viral/guides',
+        element: <GuideManagement />,
+      },
+      {
+        path: 'viral/bulk',
+        element: <BulkRegistration />,
+      },
+      {
+        path: 'viral/:vid',
+        element: <ViralDetail />,
+      },
+    ],
+  },
+]);
+
 function App() {
-  return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-      <div className="text-center space-y-6">
-        <h1 className="text-5xl font-bold tracking-tight">
-          PerformanceOne
-        </h1>
-        <p className="text-zinc-400 text-lg max-w-md mx-auto">
-          퍼포먼스 마케팅 통합 관리시스템
-        </p>
-        <div className="flex gap-3 justify-center text-sm text-zinc-500">
-          <span className="px-3 py-1 rounded-full border border-zinc-800">바이럴 관리</span>
-          <span className="px-3 py-1 rounded-full border border-zinc-800">가이드 검증</span>
-          <span className="px-3 py-1 rounded-full border border-zinc-800">댓글 모니터링</span>
-        </div>
-      </div>
-    </div>
-  )
+  return <RouterProvider router={router} />;
 }
 
-export default App
+export default App;
