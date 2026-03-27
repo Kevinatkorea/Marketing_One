@@ -1,7 +1,38 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
-const DATA_DIR = resolve(process.cwd(), 'data');
+// Vercel Serverless Functions have read-only filesystem except /tmp.
+// Use /tmp/data for writable storage; copy seed data on first access.
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL ? '/tmp/data' : resolve(process.cwd(), 'data');
+const SEED_DIR = resolve(process.cwd(), 'data', 'seed');
+
+const seededFiles = new Set<string>();
+
+async function ensureSeeded(filePath: string, fileName: string): Promise<void> {
+  if (!IS_VERCEL || seededFiles.has(fileName)) return;
+  seededFiles.add(fileName);
+  try {
+    await access(filePath);
+  } catch {
+    // File doesn't exist in /tmp yet — try to copy from seed
+    await mkdir(dirname(filePath), { recursive: true });
+    try {
+      // Read from bundled seed data and extract the relevant array
+      const seedPath = resolve(SEED_DIR, 'sample-data.json');
+      const raw = await readFile(seedPath, 'utf-8');
+      const seed = JSON.parse(raw);
+      const key = fileName.replace('.json', '');
+      if (seed[key] && Array.isArray(seed[key])) {
+        await writeFile(filePath, JSON.stringify(seed[key], null, 2), 'utf-8');
+      } else {
+        await writeFile(filePath, '[]', 'utf-8');
+      }
+    } catch {
+      await writeFile(filePath, '[]', 'utf-8');
+    }
+  }
+}
 
 // Simple in-memory file lock to prevent concurrent writes to the same file
 const fileLocks = new Map<string, Promise<void>>();
@@ -34,7 +65,10 @@ export abstract class JsonRepository<T extends { id: string }> {
   protected readonly filePath: string;
   protected readonly idPrefix: string;
 
+  protected readonly fileName: string;
+
   constructor(fileName: string, idPrefix: string) {
+    this.fileName = fileName;
     this.filePath = resolve(DATA_DIR, fileName);
     this.idPrefix = idPrefix;
   }
@@ -68,6 +102,7 @@ export abstract class JsonRepository<T extends { id: string }> {
   /** Read all items without acquiring lock (for use inside withLock). */
   protected async readAllRaw(): Promise<T[]> {
     try {
+      await ensureSeeded(this.filePath, this.fileName);
       const raw = await readFile(this.filePath, 'utf-8');
       return JSON.parse(raw) as T[];
     } catch {
