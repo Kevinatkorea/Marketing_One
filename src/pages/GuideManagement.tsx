@@ -1,34 +1,38 @@
-const mockGuides = [
-  {
-    id: 'g1',
-    name: '봄 신상품 리뷰 가이드 v2.1',
-    product: '봄 신상품',
-    version: '2.1',
-    rulesCount: 8,
-    status: 'active' as const,
-    updatedAt: '2026-03-25',
-  },
-  {
-    id: 'g2',
-    name: '프로모션 컨텐츠 가이드 v1.0',
-    product: '여름 프로모션',
-    version: '1.0',
-    rulesCount: 5,
-    status: 'draft' as const,
-    updatedAt: '2026-03-20',
-  },
-  {
-    id: 'g3',
-    name: '영상 리뷰 가이드 v1.3',
-    product: '봄 신상품',
-    version: '1.3',
-    rulesCount: 6,
-    status: 'active' as const,
-    updatedAt: '2026-03-18',
-  },
-];
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { fetchGuides } from '../services/guides';
+import { fetchProducts } from '../services/products';
+import type { Guide, Product } from '../types';
 
 export default function GuideManagement() {
+  const { id } = useParams();
+  const [guides, setGuides] = useState<Guide[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    Promise.all([fetchGuides(id), fetchProducts(id)])
+      .then(([g, p]) => {
+        setGuides(g);
+        setProducts(p);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  const productName = (productId: string) =>
+    products.find((p) => p.id === productId)?.name ?? productId;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-zinc-500">
+        가이드를 불러오는 중...
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -57,29 +61,43 @@ export default function GuideManagement() {
               </tr>
             </thead>
             <tbody>
-              {mockGuides.map((guide) => (
-                <tr
-                  key={guide.id}
-                  className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
-                >
-                  <td className="py-3 px-5 text-zinc-200 font-medium">{guide.name}</td>
-                  <td className="py-3 px-4 text-zinc-400">{guide.product}</td>
-                  <td className="py-3 px-4 text-zinc-400">v{guide.version}</td>
-                  <td className="py-3 px-4 text-zinc-400">{guide.rulesCount}개</td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        guide.status === 'active'
-                          ? 'bg-emerald-500/15 text-emerald-400'
-                          : 'bg-zinc-700/50 text-zinc-400'
-                      }`}
-                    >
-                      {guide.status === 'active' ? '활성' : '초안'}
-                    </span>
+              {guides.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-zinc-600">
+                    등록된 가이드가 없습니다.
                   </td>
-                  <td className="py-3 px-4 text-zinc-500">{guide.updatedAt}</td>
                 </tr>
-              ))}
+              ) : (
+                guides.map((guide) => (
+                  <tr
+                    key={guide.id}
+                    className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
+                  >
+                    <td className="py-3 px-5 text-zinc-200 font-medium">
+                      {guide.customGuidelines || guide.id}
+                    </td>
+                    <td className="py-3 px-4 text-zinc-400">{productName(guide.productId)}</td>
+                    <td className="py-3 px-4 text-zinc-400">v{guide.version}</td>
+                    <td className="py-3 px-4 text-zinc-400">
+                      {guide.verificationRules.length}개
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          guide.isTemplate
+                            ? 'bg-zinc-700/50 text-zinc-400'
+                            : 'bg-emerald-500/15 text-emerald-400'
+                        }`}
+                      >
+                        {guide.isTemplate ? '템플릿' : '활성'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-zinc-500">
+                      {new Date(guide.updatedAt).toLocaleDateString('ko-KR')}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

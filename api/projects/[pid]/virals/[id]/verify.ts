@@ -1,7 +1,8 @@
-// POST /api/projects/:pid/virals/:id/verify  — Trigger verification (placeholder)
+// POST /api/projects/:pid/virals/:id/verify  — 가이드 적합성 검증 실행
 
-import { viralRepo } from '../../../../../lib/repositories/index.js';
+import { viralRepo, guideRepo } from '../../../../../lib/repositories/index.js';
 import { errorResponse, jsonResponse, getPathParam } from '../../../../../lib/api-utils.js';
+import { verifyViral } from '../../../../../lib/services/verifier.js';
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -11,40 +12,32 @@ export async function POST(request: Request): Promise<Response> {
     const viral = await viralRepo.findById(id);
     if (!viral) return errorResponse('Viral not found', 404);
 
-    // Placeholder: generate a mock verification result
-    const mockResults = ['ok', 'warning', 'fail'] as const;
-    const result = mockResults[Math.floor(Math.random() * mockResults.length)];
-    const score = result === 'ok' ? 95 : result === 'warning' ? 70 : 30;
-    const grade = result === 'ok' ? 'green' : result === 'warning' ? 'yellow' : 'red';
+    // Find the associated guide
+    const guide = viral.guideId ? await guideRepo.findById(viral.guideId) : null;
+    if (!guide) {
+      return errorResponse('가이드를 찾을 수 없습니다. 바이럴에 가이드를 연결해주세요.', 400);
+    }
+
+    // Run verification
+    const result = await verifyViral(viral.url, guide);
 
     const now = new Date().toISOString();
     const attempt = (viral.verificationHistory?.length ?? 0) + 1;
 
     const updated = await viralRepo.update(id, {
-      status: result === 'fail' ? 'failed' : 'verified',
+      status: result.result === 'fail' ? 'failed' : 'verified',
       verification: {
-        result,
-        score,
-        grade,
+        ...result,
         checkedAt: now,
-        details: [
-          {
-            ruleId: 'mock_rule_1',
-            passed: result !== 'fail',
-            score,
-            note: `Mock verification - ${result}`,
-          },
-        ],
-        issues: result === 'fail' ? ['Mock: content does not meet guidelines'] : [],
       },
       verificationHistory: [
         ...(viral.verificationHistory || []),
-        { attempt, result, score, verifiedAt: now },
+        { attempt, result: result.result, score: result.score, verifiedAt: now },
       ],
     });
 
     return jsonResponse({
-      message: 'Verification complete (mock)',
+      message: '검증 완료',
       verification: updated.verification,
     });
   } catch (err) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   PieChart,
@@ -14,96 +14,9 @@ import {
   Legend,
 } from 'recharts';
 import StatCard from '../components/dashboard/StatCard';
-
-// --- Mock data ---
-
-const pieData = [
-  { name: '적합', value: 32, color: '#34d399' },
-  { name: '경고', value: 8, color: '#fbbf24' },
-  { name: '부적합', value: 5, color: '#f87171' },
-];
-
-const barData = [
-  { name: '키워드 누락', count: 8 },
-  { name: '이미지 미포함', count: 5 },
-  { name: '링크 오류', count: 3 },
-  { name: '가이드 불일치', count: 2 },
-  { name: '기타', count: 1 },
-];
-
-interface MockViral {
-  id: string;
-  title: string;
-  platform: string;
-  author: string;
-  status: 'pending' | 'verified' | 'failed';
-  result: 'ok' | 'warning' | 'fail' | null;
-  negativeComments: number;
-  createdAt: string;
-}
-
-const mockVirals: MockViral[] = [
-  {
-    id: 'v1',
-    title: '봄 신상품 리뷰 - 자연스러운 일상 후기',
-    platform: '네이버 카페',
-    author: 'blogger_01',
-    status: 'verified',
-    result: 'ok',
-    negativeComments: 0,
-    createdAt: '2026-03-25',
-  },
-  {
-    id: 'v2',
-    title: '신상 화장품 솔직 리뷰',
-    platform: '네이버 블로그',
-    author: 'beauty_queen',
-    status: 'verified',
-    result: 'ok',
-    negativeComments: 1,
-    createdAt: '2026-03-24',
-  },
-  {
-    id: 'v3',
-    title: '봄맞이 쇼핑 하울 영상',
-    platform: '유튜브',
-    author: 'shopaholic_kr',
-    status: 'verified',
-    result: 'warning',
-    negativeComments: 2,
-    createdAt: '2026-03-24',
-  },
-  {
-    id: 'v4',
-    title: '데일리 뷰티 루틴에 추가한 신제품',
-    platform: '인스타그램',
-    author: 'daily_beauty',
-    status: 'pending',
-    result: null,
-    negativeComments: 0,
-    createdAt: '2026-03-23',
-  },
-  {
-    id: 'v5',
-    title: '신상품 첫인상 후기',
-    platform: '네이버 카페',
-    author: 'review_master',
-    status: 'verified',
-    result: 'fail',
-    negativeComments: 3,
-    createdAt: '2026-03-22',
-  },
-  {
-    id: 'v6',
-    title: '봄 컬렉션 비교 리뷰',
-    platform: '네이버 블로그',
-    author: 'compare_kr',
-    status: 'verified',
-    result: 'ok',
-    negativeComments: 0,
-    createdAt: '2026-03-22',
-  },
-];
+import { fetchViralDashboard, type ViralDashboardStats } from '../services/dashboard';
+import { fetchVirals } from '../services/virals';
+import type { Viral } from '../types';
 
 const statusBadge = (status: string, result: string | null) => {
   if (status === 'pending') {
@@ -138,14 +51,64 @@ type FilterStatus = 'all' | 'pending' | 'ok' | 'warning' | 'fail';
 
 export default function ViralManagement() {
   const [filter, setFilter] = useState<FilterStatus>('all');
+  const [stats, setStats] = useState<ViralDashboardStats | null>(null);
+  const [virals, setVirals] = useState<Viral[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { id } = useParams();
 
-  const filteredVirals = mockVirals.filter((v) => {
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    Promise.all([
+      fetchViralDashboard(id),
+      fetchVirals(id, { pageSize: 100 }),
+    ])
+      .then(([dashData, viralData]) => {
+        setStats(dashData);
+        setVirals(viralData.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  const filteredVirals = virals.filter((v) => {
     if (filter === 'all') return true;
     if (filter === 'pending') return v.status === 'pending';
-    return v.result === filter;
+    return v.verification.result === filter;
   });
+
+  const pieData = stats
+    ? [
+        { name: '적합', value: stats.resultDistribution.ok, color: '#34d399' },
+        { name: '경고', value: stats.resultDistribution.warning, color: '#fbbf24' },
+        { name: '부적합', value: stats.resultDistribution.fail, color: '#f87171' },
+      ].filter((d) => d.value > 0)
+    : [];
+
+  const barData = stats?.failReasons ?? [];
+
+  const complianceRate =
+    stats && stats.totalVirals > 0
+      ? Math.round((stats.resultDistribution.ok / stats.totalVirals) * 100)
+      : 0;
+
+  const timeSince = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}분전`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}시간전`;
+    return `${Math.floor(hours / 24)}일전`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-zinc-500">
+        데이터를 불러오는 중...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -153,22 +116,22 @@ export default function ViralManagement() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard
           title="총 바이럴"
-          value="45건"
+          value={`${stats?.totalVirals ?? 0}건`}
           subtitle="전체 등록 바이럴 수"
           color="blue"
           icon="📊"
         />
         <StatCard
           title="검증완료"
-          value="42건"
-          subtitle="검증 진행률 93%"
+          value={`${stats?.verifiedCount ?? 0}건`}
+          subtitle={`검증 진행률 ${stats && stats.totalVirals > 0 ? Math.round(((stats.verifiedCount + stats.failedCount) / stats.totalVirals) * 100) : 0}%`}
           trend="up"
           color="green"
           icon="✅"
         />
         <StatCard
           title="적합률"
-          value="85%"
+          value={`${complianceRate}%`}
           subtitle="전체 대비 적합 비율"
           trend="up"
           color="blue"
@@ -176,7 +139,7 @@ export default function ViralManagement() {
         />
         <StatCard
           title="부정댓글"
-          value="3건"
+          value={`${stats?.negativeCommentCount ?? 0}건`}
           subtitle="즉시 대응 필요"
           trend="down"
           color="red"
@@ -184,8 +147,8 @@ export default function ViralManagement() {
         />
         <StatCard
           title="마지막 업데이트"
-          value="5분전"
-          subtitle="2026-03-27 14:25"
+          value={stats?.lastUpdated ? timeSince(stats.lastUpdated) : '-'}
+          subtitle={stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleString('ko-KR') : ''}
           color="zinc"
           icon="⏰"
         />
@@ -196,69 +159,81 @@ export default function ViralManagement() {
         {/* Donut Chart */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">검증결과 분포</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={90}
-                paddingAngle={3}
-                dataKey="value"
-                stroke="none"
-              >
-                {pieData.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#18181b',
-                  border: '1px solid #27272a',
-                  borderRadius: '8px',
-                  color: '#e4e4e7',
-                  fontSize: '13px',
-                }}
-              />
-              <Legend
-                iconType="circle"
-                iconSize={8}
-                formatter={(value: string) => (
-                  <span className="text-xs text-zinc-400">{value}</span>
-                )}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+          {pieData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={3}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {pieData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#18181b',
+                    border: '1px solid #27272a',
+                    borderRadius: '8px',
+                    color: '#e4e4e7',
+                    fontSize: '13px',
+                  }}
+                />
+                <Legend
+                  iconType="circle"
+                  iconSize={8}
+                  formatter={(value: string) => (
+                    <span className="text-xs text-zinc-400">{value}</span>
+                  )}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-60 text-zinc-600 text-sm">
+              검증 데이터가 없습니다
+            </div>
+          )}
         </div>
 
         {/* Bar Chart */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">부적합 원인 분석</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={barData} layout="vertical" margin={{ left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
-              <XAxis type="number" tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} />
-              <YAxis
-                dataKey="name"
-                type="category"
-                tick={{ fill: '#a1a1aa', fontSize: 12 }}
-                axisLine={false}
-                tickLine={false}
-                width={90}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#18181b',
-                  border: '1px solid #27272a',
-                  borderRadius: '8px',
-                  color: '#e4e4e7',
-                  fontSize: '13px',
-                }}
-              />
-              <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
-            </BarChart>
-          </ResponsiveContainer>
+          {barData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={barData} layout="vertical" margin={{ left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
+                <XAxis type="number" tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} />
+                <YAxis
+                  dataKey="reason"
+                  type="category"
+                  tick={{ fill: '#a1a1aa', fontSize: 12 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={90}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#18181b',
+                    border: '1px solid #27272a',
+                    borderRadius: '8px',
+                    color: '#e4e4e7',
+                    fontSize: '13px',
+                  }}
+                />
+                <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-60 text-zinc-600 text-sm">
+              부적합 데이터가 없습니다
+            </div>
+          )}
         </div>
       </div>
 
@@ -318,18 +293,20 @@ export default function ViralManagement() {
                   <td className="py-3 px-4 text-zinc-400">{viral.platform}</td>
                   <td className="py-3 px-4 text-zinc-400">{viral.author}</td>
                   <td className="py-3 px-4">
-                    {statusBadge(viral.status, viral.result)}
+                    {statusBadge(viral.status, viral.verification.result)}
                   </td>
                   <td className="py-3 px-4">
                     <span
                       className={
-                        viral.negativeComments > 0 ? 'text-red-400' : 'text-zinc-600'
+                        viral.comments.negativeCount > 0 ? 'text-red-400' : 'text-zinc-600'
                       }
                     >
-                      {viral.negativeComments}건
+                      {viral.comments.negativeCount}건
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-zinc-500">{viral.createdAt}</td>
+                  <td className="py-3 px-4 text-zinc-500">
+                    {new Date(viral.createdAt).toLocaleDateString('ko-KR')}
+                  </td>
                 </tr>
               ))}
               {filteredVirals.length === 0 && (

@@ -1,61 +1,73 @@
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { fetchViral, verifyViral, fetchViralComments } from '../services/virals';
+import type { Viral, Comment } from '../types';
 
-const ruleLabels: Record<string, string> = {
-  r1: '필수 키워드 포함',
-  r2: '이미지 포함 여부',
-  r3: '최소 글자수',
-  r4: '링크 정상 작동',
-  r5: '가이드 문구 일치',
+const gradeStyle: Record<string, string> = {
+  green: 'bg-emerald-500/15 text-emerald-400',
+  yellow: 'bg-amber-500/15 text-amber-400',
+  red: 'bg-red-500/15 text-red-400',
 };
 
-const mockViral = {
-  id: 'v1',
-  title: '봄 신상품 리뷰 - 자연스러운 일상 후기',
-  url: 'https://cafe.naver.com/example/12345',
-  platform: '네이버 카페',
-  cafeName: '뷰티톡',
-  author: 'blogger_01',
-  status: 'verified' as const,
-  createdAt: '2026-03-25 14:30',
-  verification: {
-    result: 'ok' as const,
-    score: 92,
-    checkedAt: '2026-03-25 14:35',
-    details: [
-      { ruleId: 'r1', passed: true, score: 100, note: '5개 중 5개 포함' },
-      { ruleId: 'r2', passed: true, score: 100, note: '3장 확인' },
-      { ruleId: 'r3', passed: true, score: 100, note: '1,200자 (최소 500자)' },
-      { ruleId: 'r4', passed: true, score: 100, note: '200 OK' },
-      { ruleId: 'r5', passed: false, score: 60, note: '일부 문구 변형 감지' },
-    ],
-  },
-  comments: [
-    {
-      id: 'c1',
-      author: '유저A',
-      content: '좋은 리뷰 감사합니다!',
-      sentiment: 'positive' as const,
-      date: '2026-03-25 15:00',
-    },
-    {
-      id: 'c2',
-      author: '유저B',
-      content: '이거 광고 아닌가요?',
-      sentiment: 'negative' as const,
-      date: '2026-03-25 16:20',
-    },
-    {
-      id: 'c3',
-      author: '유저C',
-      content: '저도 써봤는데 괜찮았어요',
-      sentiment: 'positive' as const,
-      date: '2026-03-25 17:10',
-    },
-  ],
+const gradeLabel: Record<string, string> = {
+  green: '적합',
+  yellow: '경고',
+  red: '부적합',
 };
 
 export default function ViralDetail() {
   const { id, vid } = useParams();
+  const [viral, setViral] = useState<Viral | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    if (!id || !vid) return;
+    setLoading(true);
+    Promise.all([
+      fetchViral(id, vid),
+      fetchViralComments(id, vid).catch(() => []),
+    ])
+      .then(([v, c]) => {
+        setViral(v);
+        setComments(c);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [id, vid]);
+
+  const handleVerify = async () => {
+    if (!id || !vid) return;
+    setVerifying(true);
+    try {
+      const updated = await verifyViral(id, vid);
+      setViral(updated);
+    } catch {
+      // verification endpoint may not be fully implemented yet
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-zinc-500">
+        바이럴 정보를 불러오는 중...
+      </div>
+    );
+  }
+
+  if (!viral) {
+    return (
+      <div className="text-center py-24 text-zinc-500">
+        바이럴을 찾을 수 없습니다.
+      </div>
+    );
+  }
+
+  const grade = viral.verification.grade;
+  const score = viral.verification.score;
 
   return (
     <div className="space-y-6">
@@ -80,42 +92,57 @@ export default function ViralDetail() {
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 className="text-lg font-bold text-zinc-100">{mockViral.title}</h1>
-            <p className="text-sm text-zinc-500 mt-1">ID: {vid}</p>
+            <h1 className="text-lg font-bold text-zinc-100">{viral.title}</h1>
+            <p className="text-sm text-zinc-500 mt-1">ID: {viral.id}</p>
           </div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
-            적합
-          </span>
+          {grade ? (
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${gradeStyle[grade] ?? 'bg-zinc-700/50 text-zinc-400'}`}>
+              {gradeLabel[grade] ?? '미검증'}
+            </span>
+          ) : (
+            <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-zinc-700/50 text-zinc-400">
+              미검증
+            </span>
+          )}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
             <span className="text-zinc-500">플랫폼</span>
-            <p className="text-zinc-200 mt-0.5">{mockViral.platform}</p>
+            <p className="text-zinc-200 mt-0.5">{viral.platform}</p>
           </div>
           <div>
             <span className="text-zinc-500">카페명</span>
-            <p className="text-zinc-200 mt-0.5">{mockViral.cafeName}</p>
+            <p className="text-zinc-200 mt-0.5">{viral.cafeName || '-'}</p>
           </div>
           <div>
             <span className="text-zinc-500">작성자</span>
-            <p className="text-zinc-200 mt-0.5">{mockViral.author}</p>
+            <p className="text-zinc-200 mt-0.5">{viral.author}</p>
           </div>
           <div>
             <span className="text-zinc-500">등록일</span>
-            <p className="text-zinc-200 mt-0.5">{mockViral.createdAt}</p>
+            <p className="text-zinc-200 mt-0.5">
+              {new Date(viral.createdAt).toLocaleString('ko-KR')}
+            </p>
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-zinc-800">
+        <div className="mt-4 pt-4 border-t border-zinc-800 flex items-center justify-between">
           <a
-            href={mockViral.url}
+            href={viral.url}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
           >
-            {mockViral.url} ↗
+            {viral.url} ↗
           </a>
+          <button
+            onClick={handleVerify}
+            disabled={verifying}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
+          >
+            {verifying ? '검증 중...' : '재검증'}
+          </button>
         </div>
       </div>
 
@@ -125,82 +152,148 @@ export default function ViralDetail() {
           <h2 className="text-base font-semibold text-zinc-200">검증 결과</h2>
           <div className="flex items-center gap-3 text-sm">
             <span className="text-zinc-500">
-              점수: <span className="text-blue-400 font-semibold">{mockViral.verification.score}점</span>
+              점수: <span className="text-blue-400 font-semibold">{score ?? '-'}점</span>
             </span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-500">
-              검증일: {mockViral.verification.checkedAt}
-            </span>
+            {viral.verification.checkedAt && (
+              <>
+                <span className="text-zinc-600">|</span>
+                <span className="text-zinc-500">
+                  검증일: {new Date(viral.verification.checkedAt).toLocaleString('ko-KR')}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="space-y-2">
-          {mockViral.verification.details.map((detail, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between py-2.5 px-4 rounded-lg bg-zinc-800/50"
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
-                    detail.passed
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-red-500/20 text-red-400'
-                  }`}
-                >
-                  {detail.passed ? '✓' : '✗'}
-                </span>
-                <span className="text-sm text-zinc-300">{ruleLabels[detail.ruleId] || detail.ruleId}</span>
+        {viral.verification.details.length > 0 ? (
+          <div className="space-y-2">
+            {viral.verification.details.map((detail, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between py-2.5 px-4 rounded-lg bg-zinc-800/50"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                      detail.passed
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-red-500/20 text-red-400'
+                    }`}
+                  >
+                    {detail.passed ? '✓' : '✗'}
+                  </span>
+                  <span className="text-sm text-zinc-300">{detail.ruleId}</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-zinc-500">{detail.note}</span>
+                  <span className="text-xs font-medium text-zinc-400">{detail.score}점</span>
+                </div>
               </div>
-              <span className="text-xs text-zinc-500">{detail.note}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-zinc-600 text-sm">
+            아직 검증이 실행되지 않았습니다.
+          </div>
+        )}
+
+        {viral.verification.issues.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-zinc-800">
+            <h3 className="text-sm font-medium text-red-400 mb-2">문제 사항</h3>
+            <ul className="space-y-1">
+              {viral.verification.issues.map((issue, i) => (
+                <li key={i} className="text-sm text-zinc-400 flex items-center gap-2">
+                  <span className="text-red-400">•</span> {issue}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
+
+      {/* Verification History */}
+      {viral.verificationHistory.length > 0 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+          <h2 className="text-base font-semibold text-zinc-200 mb-4">검증 이력</h2>
+          <div className="space-y-2">
+            {viral.verificationHistory.map((entry, i) => (
+              <div key={i} className="flex items-center justify-between py-2 px-4 rounded-lg bg-zinc-800/50">
+                <span className="text-sm text-zinc-300">#{entry.attempt}차 검증</span>
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${gradeStyle[entry.result === 'ok' ? 'green' : entry.result === 'warning' ? 'yellow' : 'red']}`}>
+                    {entry.result === 'ok' ? '적합' : entry.result === 'warning' ? '경고' : '부적합'} {entry.score}점
+                  </span>
+                  <span className="text-xs text-zinc-500">
+                    {new Date(entry.verifiedAt).toLocaleString('ko-KR')}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Comments */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
         <h2 className="text-base font-semibold text-zinc-200 mb-4">
-          댓글 ({mockViral.comments.length})
+          댓글 ({comments.length})
+          {viral.comments.negativeCount > 0 && (
+            <span className="ml-2 text-xs text-red-400 font-normal">
+              부정 {viral.comments.negativeCount}건
+            </span>
+          )}
         </h2>
 
-        <div className="space-y-3">
-          {mockViral.comments.map((comment) => (
-            <div
-              key={comment.id}
-              className={`p-4 rounded-lg border ${
-                comment.sentiment === 'negative'
-                  ? 'bg-red-500/5 border-red-500/20'
-                  : 'bg-zinc-800/50 border-zinc-800'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-zinc-300">
-                    {comment.author}
-                  </span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                      comment.sentiment === 'positive'
-                        ? 'bg-emerald-500/15 text-emerald-400'
+        {comments.length > 0 ? (
+          <div className="space-y-3">
+            {comments.map((comment) => (
+              <div
+                key={comment.id}
+                className={`p-4 rounded-lg border ${
+                  comment.isNegative
+                    ? 'bg-red-500/5 border-red-500/20'
+                    : 'bg-zinc-800/50 border-zinc-800'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-zinc-300">
+                      {comment.author}
+                    </span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        comment.sentiment === 'positive'
+                          ? 'bg-emerald-500/15 text-emerald-400'
+                          : comment.sentiment === 'negative'
+                          ? 'bg-red-500/15 text-red-400'
+                          : 'bg-zinc-700/50 text-zinc-400'
+                      }`}
+                    >
+                      {comment.sentiment === 'positive'
+                        ? '긍정'
                         : comment.sentiment === 'negative'
-                        ? 'bg-red-500/15 text-red-400'
-                        : 'bg-zinc-700/50 text-zinc-400'
-                    }`}
-                  >
-                    {comment.sentiment === 'positive'
-                      ? '긍정'
-                      : comment.sentiment === 'negative'
-                      ? '부정'
-                      : '중립'}
+                        ? '부정'
+                        : '중립'}
+                    </span>
+                    {comment.priority === 'immediate' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-red-500/15 text-red-400">
+                        즉시대응
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-zinc-600">
+                    {new Date(comment.originalDate).toLocaleString('ko-KR')}
                   </span>
                 </div>
-                <span className="text-xs text-zinc-600">{comment.date}</span>
+                <p className="text-sm text-zinc-400">{comment.content}</p>
               </div>
-              <p className="text-sm text-zinc-400">{comment.content}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-zinc-600 text-sm">
+            수집된 댓글이 없습니다.
+          </div>
+        )}
       </div>
     </div>
   );
