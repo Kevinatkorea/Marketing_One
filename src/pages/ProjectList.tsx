@@ -2,10 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore';
 import { fetchViralDashboard, type ViralDashboardStats } from '../services/dashboard';
+import { createProject } from '../services/projects';
 
 export default function ProjectList() {
   const { projects, loading, fetchProjects } = useProjectStore();
   const [statsMap, setStatsMap] = useState<Record<string, ViralDashboardStats>>({});
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: '', description: '', owner: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchProjects();
@@ -19,6 +24,27 @@ export default function ProjectList() {
         .catch(() => {});
     });
   }, [projects]);
+
+  const handleCreate = async () => {
+    if (!form.name.trim()) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await createProject({
+        name: form.name,
+        description: form.description,
+        owner: form.owner || '담당자',
+        status: 'active',
+      });
+      setShowModal(false);
+      setForm({ name: '', description: '', owner: '' });
+      fetchProjects();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -42,7 +68,10 @@ export default function ProjectList() {
               <p className="text-sm text-zinc-500">퍼포먼스 마케팅 통합 관리시스템</p>
             </div>
           </div>
-          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
             + 새 프로젝트
           </button>
         </div>
@@ -80,11 +109,7 @@ export default function ProjectList() {
                       {project.status === 'active' ? '진행중' : '종료'}
                     </span>
                   </div>
-
-                  <p className="text-sm text-zinc-500 mb-4 line-clamp-2">
-                    {project.description}
-                  </p>
-
+                  <p className="text-sm text-zinc-500 mb-4 line-clamp-2">{project.description}</p>
                   <div className="flex items-center gap-4 text-xs text-zinc-500">
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-blue-500" />
@@ -99,7 +124,6 @@ export default function ProjectList() {
                       대기 {stats?.pendingCount ?? '-'}건
                     </span>
                   </div>
-
                   <div className="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-600">
                     <span>담당: {project.owner}</span>
                     <span>{new Date(project.updatedAt).toLocaleDateString('ko-KR')}</span>
@@ -110,6 +134,70 @@ export default function ProjectList() {
           </div>
         )}
       </div>
+
+      {/* Create Project Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowModal(false)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-100 mb-4">새 프로젝트 만들기</h2>
+
+            {error && (
+              <div className="mb-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-sm text-zinc-400">프로젝트명 *</span>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="2026 봄 신상품 런칭"
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm text-zinc-400">설명</span>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="프로젝트에 대한 간단한 설명"
+                  rows={3}
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm text-zinc-400">담당자</span>
+                <input
+                  type="text"
+                  value={form.owner}
+                  onChange={(e) => setForm({ ...form, owner: e.target.value })}
+                  placeholder="마케팅팀"
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={submitting || !form.name.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                {submitting ? '생성 중...' : '프로젝트 생성'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

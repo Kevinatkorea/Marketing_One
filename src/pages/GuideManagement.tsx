@@ -1,29 +1,94 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { fetchGuides } from '../services/guides';
+import { fetchGuides, createGuide } from '../services/guides';
 import { fetchProducts } from '../services/products';
-import type { Guide, Product } from '../types';
+import type { Guide, Product, VerificationRule } from '../types';
+
+const DEFAULT_RULES: VerificationRule[] = [
+  { ruleId: 'required_keywords', name: '필수 키워드 포함', weight: 30, isAutoFail: false, config: { keywords: [], minMatch: 1 } },
+  { ruleId: 'forbidden_keywords', name: '금지 키워드 미사용', weight: 25, isAutoFail: true, config: { keywords: [] } },
+  { ruleId: 'tone_check', name: '톤앤매너 AI 분석', weight: 20, isAutoFail: false, config: { toneGuide: '' } },
+  { ruleId: 'content_structure', name: '콘텐츠 구조', weight: 15, isAutoFail: false, config: { requireImages: true, requirePurchaseLink: false, minLength: 500 } },
+  { ruleId: 'naver_policy', name: '네이버 광고 정책', weight: 10, isAutoFail: true, config: { policyVersion: '2026-03' } },
+];
 
 export default function GuideManagement() {
   const { id } = useParams();
   const [guides, setGuides] = useState<Guide[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    productId: '',
+    version: '1.0',
+    customGuidelines: '',
+    requiredKeywords: '',
+    forbiddenKeywords: '',
+    toneGuide: '',
+    minLength: '500',
+  });
 
   useEffect(() => {
+    if (!id) return;
+    loadData();
+  }, [id]);
+
+  const loadData = () => {
     if (!id) return;
     setLoading(true);
     Promise.all([fetchGuides(id), fetchProducts(id)])
       .then(([g, p]) => {
         setGuides(g);
         setProducts(p);
+        if (p.length > 0 && !form.productId) setForm((f) => ({ ...f, productId: p[0].id }));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [id]);
+  };
 
   const productName = (productId: string) =>
     products.find((p) => p.id === productId)?.name ?? productId;
+
+  const handleCreate = async () => {
+    if (!id || !form.productId) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const rules: VerificationRule[] = DEFAULT_RULES.map((r) => {
+        if (r.ruleId === 'required_keywords') {
+          const kw = form.requiredKeywords.split(',').map((k) => k.trim()).filter(Boolean);
+          return { ...r, config: { keywords: kw, minMatch: Math.max(1, Math.ceil(kw.length * 0.6)) } };
+        }
+        if (r.ruleId === 'forbidden_keywords') {
+          return { ...r, config: { keywords: form.forbiddenKeywords.split(',').map((k) => k.trim()).filter(Boolean) } };
+        }
+        if (r.ruleId === 'tone_check') {
+          return { ...r, config: { toneGuide: form.toneGuide || '자연스러운 후기 톤, 과장 금지' } };
+        }
+        if (r.ruleId === 'content_structure') {
+          return { ...r, config: { requireImages: true, requirePurchaseLink: false, minLength: parseInt(form.minLength) || 500 } };
+        }
+        return r;
+      });
+
+      await createGuide(id, {
+        productId: form.productId,
+        version: form.version,
+        verificationRules: rules,
+        customGuidelines: form.customGuidelines,
+        isTemplate: false,
+      });
+      setShowModal(false);
+      setForm({ productId: products[0]?.id || '', version: '1.0', customGuidelines: '', requiredKeywords: '', forbiddenKeywords: '', toneGuide: '', minLength: '500' });
+      loadData();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -41,7 +106,13 @@ export default function GuideManagement() {
           <h1 className="text-xl font-bold text-zinc-100">가이드 관리</h1>
           <p className="text-sm text-zinc-500 mt-1">바이럴 검증 가이드를 관리합니다</p>
         </div>
-        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
+        <button
+          onClick={() => {
+            if (products.length > 0) setForm((f) => ({ ...f, productId: products[0].id }));
+            setShowModal(true);
+          }}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+        >
           + 가이드 등록
         </button>
       </div>
@@ -64,7 +135,7 @@ export default function GuideManagement() {
               {guides.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-zinc-600">
-                    등록된 가이드가 없습니다.
+                    등록된 가이드가 없습니다. 가이드를 등록해 보세요.
                   </td>
                 </tr>
               ) : (
@@ -102,6 +173,113 @@ export default function GuideManagement() {
           </table>
         </div>
       </div>
+
+      {/* Create Guide Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowModal(false)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-100 mb-4">가이드 등록</h2>
+
+            {error && (
+              <div className="mb-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-sm text-zinc-400">상품 선택 *</span>
+                  <select
+                    value={form.productId}
+                    onChange={(e) => setForm({ ...form, productId: e.target.value })}
+                    className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {products.length === 0 && <option value="">상품 없음</option>}
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-sm text-zinc-400">버전</span>
+                  <input
+                    type="text"
+                    value={form.version}
+                    onChange={(e) => setForm({ ...form, version: e.target.value })}
+                    className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-sm text-zinc-400">필수 키워드 (쉼표 구분)</span>
+                <input
+                  type="text"
+                  value={form.requiredKeywords}
+                  onChange={(e) => setForm({ ...form, requiredKeywords: e.target.value })}
+                  placeholder="수분크림, 봄 한정, 촉촉"
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm text-zinc-400">금지 키워드 (쉼표 구분)</span>
+                <input
+                  type="text"
+                  value={form.forbiddenKeywords}
+                  onChange={(e) => setForm({ ...form, forbiddenKeywords: e.target.value })}
+                  placeholder="최저가, 할인, 1+1"
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm text-zinc-400">톤앤매너 가이드</span>
+                <input
+                  type="text"
+                  value={form.toneGuide}
+                  onChange={(e) => setForm({ ...form, toneGuide: e.target.value })}
+                  placeholder="자연스러운 후기 톤, 과장 금지"
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm text-zinc-400">최소 글자수</span>
+                <input
+                  type="number"
+                  value={form.minLength}
+                  onChange={(e) => setForm({ ...form, minLength: e.target.value })}
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm text-zinc-400">기타 가이드라인</span>
+                <textarea
+                  value={form.customGuidelines}
+                  onChange={(e) => setForm({ ...form, customGuidelines: e.target.value })}
+                  placeholder="개인 경험 위주로 작성, 비교 제품 언급 자제"
+                  rows={2}
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={submitting || !form.productId}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                {submitting ? '등록 중...' : '가이드 등록'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -381,7 +381,7 @@ async function handleViralVerify(viralId: string): Promise<Response> {
   const now = new Date().toISOString();
   const attempt = (viral.verificationHistory?.length ?? 0) + 1;
   const updated = await viralRepo.update(viralId, { status: result.result === 'fail' ? 'failed' : 'verified', verification: { ...result, checkedAt: now }, verificationHistory: [...(viral.verificationHistory || []), { attempt, result: result.result, score: result.score, verifiedAt: now }] });
-  return jsonResponse({ message: '검증 완료', verification: updated.verification });
+  return jsonResponse(updated);
 }
 
 async function handleViralCommentsGet(viralId: string): Promise<Response> {
