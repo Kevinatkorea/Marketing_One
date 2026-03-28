@@ -71,7 +71,8 @@ async function handleProject(request: Request, pid: string): Promise<Response> {
   if (method(request) === 'DELETE') {
     const existing = await projectRepo.findById(pid);
     if (!existing) return errorResponse('Project not found', 404);
-    return jsonResponse(await projectRepo.update(pid, { status: 'archived' }));
+    await projectRepo.delete(pid);
+    return jsonResponse({ message: '삭제 완료' });
   }
   return errorResponse('Method not allowed', 405);
 }
