@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { fetchGuides, createGuide } from '../services/guides';
+import { fetchGuides, createGuide, deleteGuide } from '../services/guides';
 import { fetchProducts, createProduct } from '../services/products';
 import type { Guide, Product, VerificationRule } from '../types';
 
@@ -22,6 +22,7 @@ export default function GuideManagement() {
   const [error, setError] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Guide | null>(null);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [addingProduct, setAddingProduct] = useState(false);
@@ -55,6 +56,15 @@ export default function GuideManagement() {
 
   const productName = (productId: string) =>
     products.find((p) => p.id === productId)?.name ?? productId;
+
+  const handleDeleteGuide = async () => {
+    if (!id || !deleteTarget) return;
+    try {
+      await deleteGuide(id, deleteTarget.id);
+      setDeleteTarget(null);
+      loadData();
+    } catch {}
+  };
 
   const handleAddProduct = async () => {
     if (!id || !newProductName.trim()) return;
@@ -155,12 +165,13 @@ export default function GuideManagement() {
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">규칙</th>
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">상태</th>
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">수정일</th>
+                <th className="w-10"></th>
               </tr>
             </thead>
             <tbody>
               {guides.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-zinc-600">
+                  <td colSpan={7} className="py-12 text-center text-zinc-600">
                     등록된 가이드가 없습니다. 가이드를 등록해 보세요.
                   </td>
                 </tr>
@@ -194,6 +205,17 @@ export default function GuideManagement() {
                     </td>
                     <td className="py-3 px-2 sm:px-4 text-zinc-500 hidden sm:table-cell">
                       {new Date(guide.updatedAt).toLocaleDateString('ko-KR')}
+                    </td>
+                    <td className="py-3 px-2">
+                      <button
+                        onClick={() => setDeleteTarget(guide)}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                        title="삭제"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                          <path d="M4 4l8 8M12 4l-8 8" />
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -374,6 +396,22 @@ export default function GuideManagement() {
               >
                 {submitting ? '등록 중...' : '가이드 등록'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeleteTarget(null)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 sm:p-6 w-full max-w-sm mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-zinc-100 mb-2">가이드 삭제</h3>
+            <p className="text-sm text-zinc-300 mb-5">
+              <span className="font-semibold text-zinc-100">"{deleteTarget.customGuidelines || deleteTarget.id}"</span> 가이드를 삭제하시겠습니까?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">취소</button>
+              <button onClick={handleDeleteGuide} className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg">삭제</button>
             </div>
           </div>
         </div>

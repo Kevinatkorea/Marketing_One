@@ -1,5 +1,5 @@
 import type { Guide } from '../types';
-import { get, post, put } from './api';
+import { get, post, put, del } from './api';
 
 export function fetchGuides(projectId: string): Promise<Guide[]> {
   return get<Guide[]>(`/projects/${projectId}/guides`);
@@ -37,4 +37,8 @@ export function updateGuide(projectId: string, guideId: string, data: Partial<Gu
 
 export function cloneGuide(projectId: string, guideId: string): Promise<Guide> {
   return post<Guide>(`/projects/${projectId}/guides/${guideId}/clone`, {});
+}
+
+export function deleteGuide(projectId: string, guideId: string): Promise<void> {
+  return del<void>(`/projects/${projectId}/guides/${guideId}`);
 }

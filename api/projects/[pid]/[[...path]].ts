@@ -173,6 +173,10 @@ async function handleGuides(request: Request, pid: string, subPath: string[]): P
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
     return jsonResponse(await guideRepo.update(guideId, parsed.data));
   }
+  if (method(request) === 'DELETE') {
+    await guideRepo.delete(guideId);
+    return jsonResponse({ message: '삭제 완료' });
+  }
   return errorResponse('Method not allowed', 405);
 }
 
