@@ -276,15 +276,13 @@ export default function ViralManagement() {
         <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
             <h3 className="text-sm font-semibold text-zinc-200">바이럴 목록</h3>
-            {pendingCount > 0 && (
-              <button
-                onClick={handleBulkVerify}
-                disabled={bulkVerifying}
-                className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
-              >
-                {bulkVerifying ? '검증 중...' : `대기 ${pendingCount}건 전체 검증`}
-              </button>
-            )}
+            <button
+              onClick={handleBulkVerify}
+              disabled={bulkVerifying}
+              className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+            >
+              {bulkVerifying ? '검증 중...' : pendingCount > 0 ? `대기 ${pendingCount}건 검증` : '전체 재검증'}
+            </button>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {(
@@ -353,15 +351,13 @@ export default function ViralManagement() {
                     {new Date(viral.createdAt).toLocaleDateString('ko-KR')}
                   </td>
                   <td className="py-3 px-2">
-                    {viral.status === 'pending' && (
-                      <button
-                        onClick={(e) => handleVerifySingle(e, viral.id)}
-                        disabled={verifying === viral.id}
-                        className="text-[10px] sm:text-xs px-2 py-1 bg-blue-600/15 text-blue-400 hover:bg-blue-600 hover:text-white disabled:opacity-50 font-medium rounded transition-colors whitespace-nowrap"
-                      >
-                        {verifying === viral.id ? '...' : '검증'}
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => handleVerifySingle(e, viral.id)}
+                      disabled={verifying === viral.id}
+                      className="text-[10px] sm:text-xs px-2 py-1 bg-blue-600/15 text-blue-400 hover:bg-blue-600 hover:text-white disabled:opacity-50 font-medium rounded transition-colors whitespace-nowrap"
+                    >
+                      {verifying === viral.id ? '...' : viral.status === 'pending' ? '검증' : '재검증'}
+                    </button>
                   </td>
                 </tr>
               ))}

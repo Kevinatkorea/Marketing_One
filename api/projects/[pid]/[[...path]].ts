@@ -351,7 +351,11 @@ async function handleBulkVerify(request: Request, pid: string): Promise<Response
   let virals;
   if (body?.viralIds?.length) virals = all.filter((v) => body.viralIds!.includes(v.id));
   else if (body?.batchId) virals = all.filter((v) => v.batchId === body.batchId);
-  else virals = all.filter((v) => v.status === 'pending');
+  else {
+    // 대기건 우선, 없으면 전체 재검증
+    const pending = all.filter((v) => v.status === 'pending');
+    virals = pending.length > 0 ? pending : all;
+  }
 
   if (virals.length === 0) return jsonResponse({ message: '검증할 바이럴이 없습니다', results: [] });
 
