@@ -34,6 +34,7 @@ import { verifyViral as runVerification } from '../../../lib/services/verifier.j
 import { crawlUrl } from '../../../lib/services/crawler.js';
 import { analyzeComments } from '../../../lib/services/sentiment.js';
 import ExcelJS from 'exceljs';
+import { parsePdf } from '../../../lib/services/pdfParser.js';
 import type { ViralFilters } from '../../../src/types/index.js';
 
 // ---------------------------------------------------------------------------
@@ -129,10 +130,30 @@ async function handleGuides(request: Request, pid: string, subPath: string[]): P
       return jsonResponse(await guideRepo.listByProject(pid));
     }
     if (method(request) === 'POST') {
-      const body = await parseBody(request);
-      const parsed = createGuideSchema.safeParse({ ...(body as Record<string, unknown>), projectId: pid });
+      const contentType = request.headers.get('content-type') || '';
+      let guideData: Record<string, unknown>;
+      let pdfContent: string | undefined;
+      let pdfFileName: string | undefined;
+
+      if (contentType.includes('multipart/form-data')) {
+        const formData = await request.formData();
+        const pdfFile = formData.get('pdf') as File | null;
+        guideData = JSON.parse(formData.get('data') as string || '{}');
+
+        if (pdfFile && pdfFile.size > 0) {
+          const buffer = Buffer.from(await pdfFile.arrayBuffer());
+          const parsed = await parsePdf(buffer);
+          pdfContent = parsed.text;
+          pdfFileName = pdfFile.name;
+        }
+      } else {
+        guideData = (await parseBody(request)) as Record<string, unknown>;
+      }
+
+      const parsed = createGuideSchema.safeParse({ ...guideData, projectId: pid });
       if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
-      return jsonResponse(await guideRepo.create(parsed.data), 201);
+      const createData = { ...parsed.data, ...(pdfContent ? { pdfContent, pdfFileName } : {}) };
+      return jsonResponse(await guideRepo.create(createData), 201);
     }
     return errorResponse('Method not allowed', 405);
   }

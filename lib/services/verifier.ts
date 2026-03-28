@@ -94,10 +94,13 @@ async function aiAnalysis(
       || r.name.includes('톤') || r.name.includes('정책'),
   );
 
-  if (aiRules.length === 0) return details;
+  if (aiRules.length === 0 && !guide.pdfContent) return details;
 
   const contentSnippet = crawl.text.slice(0, 3000);
   const customGuidelines = guide.customGuidelines || '';
+  const pdfSection = guide.pdfContent
+    ? `\n## 원본 가이드 문서 (PDF)\n${guide.pdfContent.slice(0, 3000)}\n\n위 PDF 가이드를 기준으로 콘텐츠가 가이드를 잘 따르고 있는지 비교 분석해주세요.\n`
+    : '';
 
   try {
     const { text: aiResult } = await generateText({
@@ -109,9 +112,10 @@ ${contentSnippet}
 
 ## 가이드라인
 ${customGuidelines}
-
+${pdfSection}
 ## 검증 항목
 ${aiRules.map((r) => `- ${r.name}: ${JSON.stringify(r.config)}`).join('\n')}
+${guide.pdfContent ? '- pdf_compliance: PDF 원본 가이드 준수 여부 (가이드 내용 vs 실제 콘텐츠 비교)' : ''}
 
 각 항목에 대해 JSON 배열로 응답하세요. 각 항목:
 {"ruleId": "규칙ID", "passed": true/false, "scoreRatio": 0.0~1.0, "note": "설명"}

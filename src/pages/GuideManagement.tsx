@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchGuides, createGuide } from '../services/guides';
 import { fetchProducts } from '../services/products';
@@ -20,6 +20,8 @@ export default function GuideManagement() {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     productId: '',
     version: '1.0',
@@ -79,8 +81,9 @@ export default function GuideManagement() {
         verificationRules: rules,
         customGuidelines: form.customGuidelines,
         isTemplate: false,
-      });
+      }, pdfFile || undefined);
       setShowModal(false);
+      setPdfFile(null);
       setForm({ productId: products[0]?.id || '', version: '1.0', customGuidelines: '', requiredKeywords: '', forbiddenKeywords: '', toneGuide: '', minLength: '500' });
       loadData();
     } catch (e) {
@@ -145,7 +148,10 @@ export default function GuideManagement() {
                     className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
                   >
                     <td className="py-3 px-3 sm:px-5 text-zinc-200 font-medium max-w-[140px] sm:max-w-none truncate">
-                      {guide.customGuidelines || guide.id}
+                      <span className="flex items-center gap-1.5">
+                        {guide.pdfFileName && <span className="text-red-400 shrink-0" title={guide.pdfFileName}>📄</span>}
+                        {guide.customGuidelines || guide.id}
+                      </span>
                     </td>
                     <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden sm:table-cell">{productName(guide.productId)}</td>
                     <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden md:table-cell">v{guide.version}</td>
@@ -250,6 +256,44 @@ export default function GuideManagement() {
                   className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </label>
+              {/* PDF Upload */}
+              <div className="block">
+                <span className="text-sm text-zinc-400">가이드 PDF 업로드</span>
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+                />
+                <div
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="mt-1 border border-dashed border-zinc-700 rounded-lg p-4 sm:p-6 text-center cursor-pointer hover:border-zinc-500 transition-colors"
+                >
+                  {pdfFile ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-red-400 text-lg">📄</span>
+                      <div className="text-left">
+                        <p className="text-sm text-blue-400 font-medium truncate max-w-[200px]">{pdfFile.name}</p>
+                        <p className="text-xs text-zinc-500">{(pdfFile.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setPdfFile(null); if (pdfInputRef.current) pdfInputRef.current.value = ''; }}
+                        className="ml-2 text-zinc-500 hover:text-red-400"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-zinc-400">블로거에게 전달하는 가이드 PDF를 업로드하세요</p>
+                      <p className="text-xs text-zinc-600 mt-1">AI가 내용을 분석하여 바이럴 검증 시 비교합니다</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <label className="block">
                 <span className="text-sm text-zinc-400">기타 가이드라인</span>
                 <textarea

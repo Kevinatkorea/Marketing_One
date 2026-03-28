@@ -49,6 +49,8 @@ export interface Guide {
   version: string;
   verificationRules: VerificationRule[];
   customGuidelines: string;
+  pdfContent?: string;
+  pdfFileName?: string;
   isTemplate: boolean;
   createdAt: string;
   updatedAt: string;

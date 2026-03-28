@@ -27,6 +27,7 @@
     "ai": "^6.0.140",
     "cheerio": "^1.2.0",
     "exceljs": "^4.4.0",
+    "pdf-parse": "^2.4.5",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.2",

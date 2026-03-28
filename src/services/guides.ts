@@ -9,7 +9,25 @@ export function fetchGuide(projectId: string, guideId: string): Promise<Guide> {
   return get<Guide>(`/projects/${projectId}/guides/${guideId}`);
 }
 
-export function createGuide(projectId: string, data: Partial<Guide>): Promise<Guide> {
+export async function createGuide(
+  projectId: string,
+  data: Partial<Guide>,
+  pdfFile?: File,
+): Promise<Guide> {
+  if (pdfFile) {
+    const formData = new FormData();
+    formData.append('pdf', pdfFile);
+    formData.append('data', JSON.stringify(data));
+    const res = await fetch(`/api/projects/${projectId}/guides`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(body.error || res.statusText);
+    }
+    return res.json();
+  }
   return post<Guide>(`/projects/${projectId}/guides`, data);
 }
 
