@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchGuides, createGuide } from '../services/guides';
-import { fetchProducts } from '../services/products';
+import { fetchProducts, createProduct } from '../services/products';
 import type { Guide, Product, VerificationRule } from '../types';
 
 const DEFAULT_RULES: VerificationRule[] = [
@@ -22,6 +22,9 @@ export default function GuideManagement() {
   const [error, setError] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [newProductName, setNewProductName] = useState('');
+  const [addingProduct, setAddingProduct] = useState(false);
   const [form, setForm] = useState({
     productId: '',
     version: '1.0',
@@ -52,6 +55,26 @@ export default function GuideManagement() {
 
   const productName = (productId: string) =>
     products.find((p) => p.id === productId)?.name ?? productId;
+
+  const handleAddProduct = async () => {
+    if (!id || !newProductName.trim()) return;
+    setAddingProduct(true);
+    try {
+      const created = await createProduct(id, {
+        name: newProductName,
+        category: '일반',
+        description: '',
+        campaignPeriod: { startDate: new Date().toISOString().split('T')[0], endDate: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0], status: 'active' },
+      });
+      const updated = await fetchProducts(id);
+      setProducts(updated);
+      setForm((f) => ({ ...f, productId: created.id }));
+      setNewProductName('');
+      setShowAddProduct(false);
+    } catch {} finally {
+      setAddingProduct(false);
+    }
+  };
 
   const handleCreate = async () => {
     if (!id || !form.productId) return;
@@ -194,19 +217,50 @@ export default function GuideManagement() {
 
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block">
+                <div className="block">
                   <span className="text-sm text-zinc-400">상품 선택 *</span>
-                  <select
-                    value={form.productId}
-                    onChange={(e) => setForm({ ...form, productId: e.target.value })}
-                    className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    {products.length === 0 && <option value="">상품 없음</option>}
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </label>
+                  {showAddProduct ? (
+                    <div className="mt-1 flex gap-2">
+                      <input
+                        type="text"
+                        value={newProductName}
+                        onChange={(e) => setNewProductName(e.target.value)}
+                        placeholder="새 상품명 입력"
+                        className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddProduct(); if (e.key === 'Escape') setShowAddProduct(false); }}
+                      />
+                      <button
+                        onClick={handleAddProduct}
+                        disabled={addingProduct || !newProductName.trim()}
+                        className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg shrink-0"
+                      >
+                        {addingProduct ? '...' : '추가'}
+                      </button>
+                      <button onClick={() => setShowAddProduct(false)} className="px-2 py-2 text-zinc-500 hover:text-zinc-300 text-xs">취소</button>
+                    </div>
+                  ) : (
+                    <div className="mt-1 flex gap-2">
+                      <select
+                        value={form.productId}
+                        onChange={(e) => setForm({ ...form, productId: e.target.value })}
+                        className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        {products.length === 0 && <option value="">상품 없음 — 먼저 추가하세요</option>}
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setShowAddProduct(true)}
+                        className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-medium rounded-lg shrink-0"
+                        title="새 상품 추가"
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <label className="block">
                   <span className="text-sm text-zinc-400">버전</span>
                   <input

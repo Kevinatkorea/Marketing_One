@@ -6,6 +6,7 @@ import ViralManagement from './pages/ViralManagement';
 import GuideManagement from './pages/GuideManagement';
 import BulkRegistration from './pages/BulkRegistration';
 import ViralDetail from './pages/ViralDetail';
+import ProductManagement from './pages/ProductManagement';
 
 const router = createBrowserRouter([
   {
@@ -31,6 +32,10 @@ const router = createBrowserRouter([
       {
         path: 'viral/guides',
         element: <GuideManagement />,
+      },
+      {
+        path: 'products',
+        element: <ProductManagement />,
       },
       {
         path: 'viral/bulk',

@@ -4,6 +4,7 @@ import { useState } from 'react';
 const navItems = [
   { to: 'viral', label: '바이럴 관리', icon: '📋' },
   { to: 'viral/guides', label: '가이드 관리', icon: '📝' },
+  { to: 'products', label: '상품 관리', icon: '📦' },
   { to: 'viral/bulk', label: '바이럴 등록', icon: '🔗' },
 ];
 
