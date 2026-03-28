@@ -167,25 +167,27 @@ JSON 배열만 출력하세요.`,
 }
 
 export async function verifyViral(url: string, guide: Guide): Promise<VerifyResult> {
-  // Step 1: Crawl
+  // Step 1: Crawl (best-effort, don't fail if crawl fails)
   const crawl = await crawlUrl(url);
-  if (!crawl.success) {
-    return {
-      result: 'fail',
-      score: 0,
-      grade: 'red',
-      details: [{
-        ruleId: 'crawl',
-        passed: false,
-        score: 0,
-        note: `크롤링 실패: ${crawl.error}`,
-      }],
-      issues: [`URL 접근 실패: ${crawl.error}`],
-    };
-  }
+  const crawlFailed = !crawl.success;
 
-  // Step 2: Phase A — Pre-check
-  const { details, autoFail } = preCheck(crawl, guide);
+  // If crawl failed, create a minimal crawl result so pre-check can still run
+  const effectiveCrawl: CrawlResult = crawlFailed
+    ? { success: false, title: '', text: '', imageCount: 0, linkCount: 0, charCount: 0, links: [], error: crawl.error }
+    : crawl;
+
+  // Step 2: Phase A — Pre-check (runs even if crawl failed, with partial data)
+  const { details, autoFail } = preCheck(effectiveCrawl, guide);
+
+  // Add crawl status as info
+  if (crawlFailed) {
+    details.unshift({
+      ruleId: 'crawl_status',
+      passed: false,
+      score: 0,
+      note: `URL 크롤링 실패: ${crawl.error || '접근 불가'} — 크롤링 없이 기본 검증 진행`,
+    });
+  }
 
   if (autoFail) {
     const totalScore = details.reduce((sum, d) => sum + d.score, 0);
