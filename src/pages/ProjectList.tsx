@@ -109,7 +109,7 @@ export default function ProjectList() {
                   {/* Delete button */}
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget({ id: project.id, name: project.name }); }}
-                    className="absolute top-3 right-3 w-7 h-7 rounded-md flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all z-10"
+                    className="absolute top-3 right-3 w-8 h-8 rounded-md flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all z-10 bg-zinc-800/80 border border-zinc-700/50"
                     title="프로젝트 삭제"
                   >
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
