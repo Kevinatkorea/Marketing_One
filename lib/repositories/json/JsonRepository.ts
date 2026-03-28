@@ -1,88 +1,81 @@
-import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { Redis } from '@upstash/redis';
 
-// Vercel Serverless Functions have read-only filesystem except /tmp.
-// Use /tmp/data for writable storage; copy seed data on first access.
-const IS_VERCEL = !!process.env.VERCEL;
-const DATA_DIR = IS_VERCEL ? '/tmp/data' : resolve(process.cwd(), 'data');
+// ---------------------------------------------------------------------------
+// Storage backend: Redis (Vercel) or filesystem (local dev)
+// ---------------------------------------------------------------------------
+
+const USE_REDIS = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+const DATA_DIR = resolve(process.cwd(), 'data');
 const SEED_DIR = resolve(process.cwd(), 'data', 'seed');
 
-const seededFiles = new Set<string>();
-
-async function ensureSeeded(filePath: string, fileName: string): Promise<void> {
-  if (!IS_VERCEL || seededFiles.has(fileName)) return;
-  seededFiles.add(fileName);
-  try {
-    await access(filePath);
-  } catch {
-    // File doesn't exist in /tmp yet — try to copy from seed
-    await mkdir(dirname(filePath), { recursive: true });
-    try {
-      // Read from bundled seed data and extract the relevant array
-      const seedPath = resolve(SEED_DIR, 'sample-data.json');
-      const raw = await readFile(seedPath, 'utf-8');
-      const seed = JSON.parse(raw);
-      const key = fileName.replace('.json', '');
-      if (seed[key] && Array.isArray(seed[key])) {
-        await writeFile(filePath, JSON.stringify(seed[key], null, 2), 'utf-8');
-      } else {
-        await writeFile(filePath, '[]', 'utf-8');
-      }
-    } catch {
-      await writeFile(filePath, '[]', 'utf-8');
-    }
+let redis: Redis | null = null;
+function getRedis(): Redis {
+  if (!redis) {
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    });
   }
+  return redis;
 }
 
-// Simple in-memory file lock to prevent concurrent writes to the same file
-const fileLocks = new Map<string, Promise<void>>();
+// Track which collections have been seeded (per cold start)
+const seededKeys = new Set<string>();
 
-async function acquireLock(filePath: string): Promise<() => void> {
-  // Wait for any existing lock on this file
-  while (fileLocks.has(filePath)) {
-    await fileLocks.get(filePath);
+async function loadSeedData(collectionName: string): Promise<unknown[]> {
+  try {
+    const seedPath = resolve(SEED_DIR, 'sample-data.json');
+    const raw = await readFile(seedPath, 'utf-8');
+    const seed = JSON.parse(raw);
+    if (seed[collectionName] && Array.isArray(seed[collectionName])) {
+      return seed[collectionName];
+    }
+  } catch { /* seed file missing */ }
+  return [];
+}
+
+// Simple in-memory lock to prevent concurrent writes
+const locks = new Map<string, Promise<void>>();
+
+async function acquireLock(key: string): Promise<() => void> {
+  while (locks.has(key)) {
+    await locks.get(key);
   }
-
-  let releaseLock: () => void;
-  const lockPromise = new Promise<void>((resolve) => {
-    releaseLock = resolve;
-  });
-  fileLocks.set(filePath, lockPromise);
-
-  return () => {
-    fileLocks.delete(filePath);
-    releaseLock!();
-  };
+  let release: () => void;
+  const p = new Promise<void>((r) => { release = r; });
+  locks.set(key, p);
+  return () => { locks.delete(key); release!(); };
 }
 
 /**
- * Base JSON file-backed repository.
+ * Base repository backed by Upstash Redis (Vercel) or JSON files (local).
  *
- * Each entity collection is stored as a JSON array in a single file
- * under the /data/ directory (e.g. data/projects.json).
+ * Each collection is stored as a JSON array under a single Redis key
+ * (e.g. "marketing:projects") or a single file (e.g. data/projects.json).
  */
 export abstract class JsonRepository<T extends { id: string }> {
+  protected readonly fileName: string;
   protected readonly filePath: string;
   protected readonly idPrefix: string;
-
-  protected readonly fileName: string;
+  private readonly redisKey: string;
+  private readonly collectionName: string;
 
   constructor(fileName: string, idPrefix: string) {
     this.fileName = fileName;
     this.filePath = resolve(DATA_DIR, fileName);
     this.idPrefix = idPrefix;
+    this.collectionName = fileName.replace('.json', '');
+    this.redisKey = `marketing:${this.collectionName}`;
   }
 
   // ------------------------------------------------------------------
   // Lock helper
   // ------------------------------------------------------------------
 
-  protected async acquireFileLock(): Promise<() => void> {
-    return acquireLock(this.filePath);
-  }
-
   protected async withLock<R>(fn: () => Promise<R>): Promise<R> {
-    const release = await this.acquireFileLock();
+    const release = await acquireLock(this.redisKey);
     try {
       return await fn();
     } finally {
@@ -91,29 +84,22 @@ export abstract class JsonRepository<T extends { id: string }> {
   }
 
   // ------------------------------------------------------------------
-  // File I/O helpers
+  // Storage I/O
   // ------------------------------------------------------------------
 
-  /** Read all items (acquires lock). Safe for read-only callers. */
   protected async readAll(): Promise<T[]> {
     return this.readAllRaw();
   }
 
-  /** Read all items without acquiring lock (for use inside withLock). */
   protected async readAllRaw(): Promise<T[]> {
-    try {
-      await ensureSeeded(this.filePath, this.fileName);
-      const raw = await readFile(this.filePath, 'utf-8');
-      return JSON.parse(raw) as T[];
-    } catch {
-      // File doesn't exist yet -- return empty collection
-      return [];
+    if (USE_REDIS) {
+      return this.readFromRedis();
     }
+    return this.readFromFile();
   }
 
-  /** Write all items (acquires lock). Safe for standalone writes. */
   protected async writeAll(items: T[]): Promise<void> {
-    const release = await this.acquireFileLock();
+    const release = await acquireLock(this.redisKey);
     try {
       await this.writeAllRaw(items);
     } finally {
@@ -121,10 +107,50 @@ export abstract class JsonRepository<T extends { id: string }> {
     }
   }
 
-  /** Write all items without acquiring lock (for use inside withLock). */
   protected async writeAllRaw(items: T[]): Promise<void> {
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, JSON.stringify(items, null, 2), 'utf-8');
+    if (USE_REDIS) {
+      await getRedis().set(this.redisKey, JSON.stringify(items));
+    } else {
+      await mkdir(dirname(this.filePath), { recursive: true });
+      await writeFile(this.filePath, JSON.stringify(items, null, 2), 'utf-8');
+    }
+  }
+
+  // --- Redis ---
+
+  private async readFromRedis(): Promise<T[]> {
+    const r = getRedis();
+
+    // Auto-seed on first access per cold start
+    if (!seededKeys.has(this.collectionName)) {
+      seededKeys.add(this.collectionName);
+      const exists = await r.exists(this.redisKey);
+      if (!exists) {
+        const seedData = await loadSeedData(this.collectionName);
+        if (seedData.length > 0) {
+          await r.set(this.redisKey, JSON.stringify(seedData));
+        }
+        return seedData as T[];
+      }
+    }
+
+    const raw = await r.get<string>(this.redisKey);
+    if (!raw) return [];
+    // Upstash may return parsed object or string
+    if (typeof raw === 'string') return JSON.parse(raw) as T[];
+    if (Array.isArray(raw)) return raw as T[];
+    return [];
+  }
+
+  // --- File ---
+
+  private async readFromFile(): Promise<T[]> {
+    try {
+      const raw = await readFile(this.filePath, 'utf-8');
+      return JSON.parse(raw) as T[];
+    } catch {
+      return [];
+    }
   }
 
   // ------------------------------------------------------------------
@@ -132,10 +158,7 @@ export abstract class JsonRepository<T extends { id: string }> {
   // ------------------------------------------------------------------
 
   protected generateIdFromItems(items: T[]): string {
-    if (items.length === 0) {
-      return `${this.idPrefix}_001`;
-    }
-
+    if (items.length === 0) return `${this.idPrefix}_001`;
     let maxNum = 0;
     for (const item of items) {
       const match = item.id.match(/_(\d+)$/);
@@ -144,9 +167,7 @@ export abstract class JsonRepository<T extends { id: string }> {
         if (num > maxNum) maxNum = num;
       }
     }
-
-    const nextNum = maxNum + 1;
-    return `${this.idPrefix}_${String(nextNum).padStart(3, '0')}`;
+    return `${this.idPrefix}_${String(maxNum + 1).padStart(3, '0')}`;
   }
 
   protected async generateId(): Promise<string> {
@@ -188,7 +209,7 @@ export abstract class JsonRepository<T extends { id: string }> {
       const items = await this.readAllRaw();
       const index = items.findIndex((item) => item.id === id);
       if (index === -1) return null;
-      const updated = { ...items[index], ...data, id } as T; // id is immutable
+      const updated = { ...items[index], ...data, id } as T;
       items[index] = updated;
       await this.writeAllRaw(items);
       return updated;

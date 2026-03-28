@@ -23,6 +23,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.64",
     "@ai-sdk/gateway": "^3.0.82",
+    "@upstash/redis": "^1.37.0",
     "ai": "^6.0.140",
     "cheerio": "^1.2.0",
     "exceljs": "^4.4.0",
