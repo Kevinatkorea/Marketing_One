@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 import StatCard from '../components/dashboard/StatCard';
 import { fetchViralDashboard, type ViralDashboardStats } from '../services/dashboard';
-import { fetchVirals } from '../services/virals';
+import { fetchVirals, verifyViral, bulkVerify } from '../services/virals';
 import type { Viral } from '../types';
 
 const statusBadge = (status: string, result: string | null) => {
@@ -54,10 +54,12 @@ export default function ViralManagement() {
   const [stats, setStats] = useState<ViralDashboardStats | null>(null);
   const [virals, setVirals] = useState<Viral[]>([]);
   const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState<string | null>(null); // viral id being verified
+  const [bulkVerifying, setBulkVerifying] = useState(false);
   const navigate = useNavigate();
   const { id } = useParams();
 
-  useEffect(() => {
+  const loadData = () => {
     if (!id) return;
     setLoading(true);
     Promise.all([
@@ -70,7 +72,38 @@ export default function ViralManagement() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadData();
   }, [id]);
+
+  const handleVerifySingle = async (e: React.MouseEvent, viralId: string) => {
+    e.stopPropagation();
+    if (!id) return;
+    setVerifying(viralId);
+    try {
+      const updated = await verifyViral(id, viralId);
+      setVirals((prev) => prev.map((v) => (v.id === viralId ? updated : v)));
+      // Refresh stats
+      fetchViralDashboard(id).then(setStats).catch(() => {});
+    } catch {} finally {
+      setVerifying(null);
+    }
+  };
+
+  const handleBulkVerify = async () => {
+    if (!id) return;
+    setBulkVerifying(true);
+    try {
+      await bulkVerify(id, {});
+      loadData();
+    } catch {} finally {
+      setBulkVerifying(false);
+    }
+  };
+
+  const pendingCount = virals.filter((v) => v.status === 'pending').length;
 
   const filteredVirals = virals.filter((v) => {
     if (filter === 'all') return true;
@@ -241,7 +274,18 @@ export default function ViralManagement() {
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg">
         {/* Table Header / Filters */}
         <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h3 className="text-sm font-semibold text-zinc-200">바이럴 목록</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-semibold text-zinc-200">바이럴 목록</h3>
+            {pendingCount > 0 && (
+              <button
+                onClick={handleBulkVerify}
+                disabled={bulkVerifying}
+                className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+              >
+                {bulkVerifying ? '검증 중...' : `대기 ${pendingCount}건 전체 검증`}
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {(
               [
@@ -278,6 +322,7 @@ export default function ViralManagement() {
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">상태</th>
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">부정댓글</th>
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">등록일</th>
+                <th className="w-16"></th>
               </tr>
             </thead>
             <tbody>
@@ -306,6 +351,17 @@ export default function ViralManagement() {
                   </td>
                   <td className="py-3 px-2 sm:px-4 text-zinc-500 hidden sm:table-cell">
                     {new Date(viral.createdAt).toLocaleDateString('ko-KR')}
+                  </td>
+                  <td className="py-3 px-2">
+                    {viral.status === 'pending' && (
+                      <button
+                        onClick={(e) => handleVerifySingle(e, viral.id)}
+                        disabled={verifying === viral.id}
+                        className="text-[10px] sm:text-xs px-2 py-1 bg-blue-600/15 text-blue-400 hover:bg-blue-600 hover:text-white disabled:opacity-50 font-medium rounded transition-colors whitespace-nowrap"
+                      >
+                        {verifying === viral.id ? '...' : '검증'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
