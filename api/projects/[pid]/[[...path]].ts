@@ -34,7 +34,6 @@ import { verifyViral as runVerification } from '../../../lib/services/verifier.j
 import { crawlUrl } from '../../../lib/services/crawler.js';
 import { analyzeComments } from '../../../lib/services/sentiment.js';
 import ExcelJS from 'exceljs';
-import { parsePdf } from '../../../lib/services/pdfParser.js';
 import type { ViralFilters } from '../../../src/types/index.js';
 
 // ---------------------------------------------------------------------------
@@ -141,6 +140,7 @@ async function handleGuides(request: Request, pid: string, subPath: string[]): P
         guideData = JSON.parse(formData.get('data') as string || '{}');
 
         if (pdfFile && pdfFile.size > 0) {
+          const { parsePdf } = await import('../../../lib/services/pdfParser.js');
           const buffer = Buffer.from(await pdfFile.arrayBuffer());
           const parsed = await parsePdf(buffer);
           pdfContent = parsed.text;
