@@ -57,10 +57,15 @@ app.post('/crawl', auth, async (req, res) => {
     await page.setViewport({ width: 1280, height: 900 });
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'ko-KR,ko;q=0.9' });
 
-    // Navigate — use domcontentloaded for faster response, then wait briefly for JS
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    // Navigate — catch timeout but still try to extract whatever loaded
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    } catch (navErr) {
+      // Timeout is OK — page may have partially loaded, continue extraction
+      if (!navErr.message.includes('timeout')) throw navErr;
+    }
     // Give JS time to render dynamic content (iframes, ajax)
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 4000));
 
     // Detect platform and extract content
     const currentUrl = page.url();
