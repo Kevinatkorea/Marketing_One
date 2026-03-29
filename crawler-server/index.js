@@ -32,7 +32,16 @@ async function getBrowser() {
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--single-process',
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--disable-translate',
+        '--no-first-run',
+        '--disable-features=site-per-process',
+        '--js-flags=--max-old-space-size=256',
       ],
+      protocolTimeout: 45000,
     });
   }
   return browser;
@@ -53,7 +62,17 @@ app.post('/crawl', auth, async (req, res) => {
     const br = await getBrowser();
     page = await br.newPage();
 
-    // Set Korean locale and realistic viewport
+    // Block heavy resources to speed up loading
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      const type = req.resourceType();
+      if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
     await page.setViewport({ width: 1280, height: 900 });
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'ko-KR,ko;q=0.9' });
 
