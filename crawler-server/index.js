@@ -57,8 +57,10 @@ app.post('/crawl', auth, async (req, res) => {
     await page.setViewport({ width: 1280, height: 900 });
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'ko-KR,ko;q=0.9' });
 
-    // Navigate with timeout
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
+    // Navigate — use domcontentloaded for faster response, then wait briefly for JS
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    // Give JS time to render dynamic content (iframes, ajax)
+    await new Promise(r => setTimeout(r, 3000));
 
     // Detect platform and extract content
     const currentUrl = page.url();
@@ -102,7 +104,7 @@ async function extractNaverCafe(page) {
   // Naver Cafe loads content in iframe
   try {
     // Wait for iframe to load
-    await page.waitForSelector('iframe#cafe_main', { timeout: 10000 });
+    await page.waitForSelector('iframe#cafe_main', { timeout: 8000 });
     const frame = await page.frames().find(f => f.url().includes('ArticleRead') || f.url().includes('cafe'));
 
     if (!frame) {
@@ -111,7 +113,7 @@ async function extractNaverCafe(page) {
     }
 
     // Wait for content to render
-    await frame.waitForSelector('.se-main-container, .article_viewer, .ContentRenderer', { timeout: 10000 }).catch(() => {});
+    await frame.waitForSelector('.se-main-container, .article_viewer, .ContentRenderer', { timeout: 8000 }).catch(() => {});
 
     const data = await frame.evaluate(() => {
       const title = document.querySelector('.title_text, .tit_area .title')?.textContent?.trim() || '';
@@ -161,12 +163,12 @@ async function extractNaverCafe(page) {
 async function extractNaverBlog(page) {
   try {
     // Blog also uses iframe
-    await page.waitForSelector('iframe#mainFrame', { timeout: 10000 });
+    await page.waitForSelector('iframe#mainFrame', { timeout: 8000 });
     const frame = page.frames().find(f => f.url().includes('PostView') || f.url().includes('blog'));
 
     if (!frame) return await extractGeneric(page);
 
-    await frame.waitForSelector('.se-main-container, .post-view, #postViewArea', { timeout: 10000 }).catch(() => {});
+    await frame.waitForSelector('.se-main-container, .post-view, #postViewArea', { timeout: 8000 }).catch(() => {});
 
     const data = await frame.evaluate(() => {
       const title = document.querySelector('.se-title-text, .pcol1, .tit_h3')?.textContent?.trim() || '';
