@@ -52,6 +52,36 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'marketing-one-crawler' });
 });
 
+// Debug endpoint — returns raw HTML for selector debugging
+app.post('/debug', auth, async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'URL is required' });
+  let page;
+  try {
+    const br = await getBrowser();
+    page = await br.newPage();
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      const type = req.resourceType();
+      if (['image', 'media', 'font'].includes(type)) req.abort();
+      else req.continue();
+    });
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    } catch (e) {
+      if (!e.message.includes('timeout')) throw e;
+    }
+    await new Promise(r => setTimeout(r, 3000));
+    const html = await page.content();
+    const finalUrl = page.url();
+    res.json({ url: finalUrl, htmlLength: html.length, htmlSnippet: html.slice(0, 5000) });
+  } catch (err) {
+    res.json({ error: err.message });
+  } finally {
+    if (page) await page.close().catch(() => {});
+  }
+});
+
 // Convert to mobile URL for faster loading (no iframe)
 function toMobileUrl(url) {
   return url
