@@ -52,6 +52,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'marketing-one-crawler' });
 });
 
+// Convert to mobile URL for faster loading (no iframe)
+function toMobileUrl(url) {
+  return url
+    .replace('://blog.naver.com/', '://m.blog.naver.com/')
+    .replace('://cafe.naver.com/', '://m.cafe.naver.com/');
+}
+
 // Main crawl endpoint
 app.post('/crawl', auth, async (req, res) => {
   const { url } = req.body;
@@ -76,11 +83,13 @@ app.post('/crawl', auth, async (req, res) => {
     await page.setViewport({ width: 1280, height: 900 });
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'ko-KR,ko;q=0.9' });
 
+    // Use mobile URL for Naver (faster, no iframe)
+    const targetUrl = toMobileUrl(url);
+
     // Navigate — catch timeout but still try to extract whatever loaded
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
     } catch (navErr) {
-      // Timeout is OK — page may have partially loaded, continue extraction
       if (!navErr.message.includes('timeout')) throw navErr;
     }
     // Give JS time to render dynamic content (iframes, ajax)
@@ -90,7 +99,9 @@ app.post('/crawl', auth, async (req, res) => {
     const currentUrl = page.url();
     let result;
 
-    if (currentUrl.includes('cafe.naver.com')) {
+    if (currentUrl.includes('m.cafe.naver.com') || currentUrl.includes('m.blog.naver.com')) {
+      result = await extractNaverMobile(page);
+    } else if (currentUrl.includes('cafe.naver.com')) {
       result = await extractNaverCafe(page);
     } else if (currentUrl.includes('blog.naver.com')) {
       result = await extractNaverBlog(page);
@@ -123,6 +134,45 @@ app.post('/crawl', auth, async (req, res) => {
 });
 
 // --- Platform-specific extractors ---
+
+async function extractNaverMobile(page) {
+  // Mobile Naver has no iframe — content is directly in the page
+  await new Promise(r => setTimeout(r, 2000)); // wait for JS render
+
+  const data = await page.evaluate(() => {
+    const title = document.querySelector(
+      '.se-title-text, .tit_viewer, .post_tit, h2.tit, .title_area .title, .ArticleTitle'
+    )?.textContent?.trim() || document.title || '';
+
+    const bodyEl = document.querySelector(
+      '.se-main-container, .post_ct, .article_viewer, ._postView, .ContentRenderer, #viewTypeSelector, .se-viewer'
+    );
+    const text = bodyEl?.textContent?.replace(/\s+/g, ' ')?.trim() || document.body?.textContent?.replace(/\s+/g, ' ')?.trim() || '';
+
+    const images = document.querySelectorAll('.se-main-container img, .post_ct img, .article_viewer img, img.se-image-resource');
+    const imageCount = Array.from(images).filter(img => (img.src || '').length > 20).length;
+
+    const links = Array.from(document.querySelectorAll('a[href]'))
+      .map(a => a.href).filter(h => h.startsWith('http'));
+
+    const commentEls = document.querySelectorAll('.u_cbox_comment_box, .comment_item, .CommentItem');
+    const comments = Array.from(commentEls).map(el => ({
+      author: el.querySelector('.u_cbox_nick, .comment_nickname, .nick')?.textContent?.trim() || '익명',
+      content: el.querySelector('.u_cbox_contents, .text_comment, .comment_text')?.textContent?.trim() || '',
+    })).filter(c => c.content.length > 0);
+
+    return {
+      title,
+      text: text.slice(0, 15000),
+      imageCount,
+      linkCount: links.length,
+      charCount: text.length,
+      links: links.slice(0, 30),
+      comments,
+    };
+  });
+  return data;
+}
 
 async function extractNaverCafe(page) {
   // Naver Cafe loads content in iframe
