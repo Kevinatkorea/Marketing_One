@@ -128,19 +128,31 @@ export function parseViralText(text: string): ParsedViralEntry[] {
 
     for (const line of lines) {
       if (isUrl(line)) {
-        const url = line.trim();
+        // URL이 줄 중간에 있을 수 있음: "제목   https://..." → 분리
+        const urlMatch = line.match(/(https?:\/\/\S+)/);
+        const url = urlMatch ? urlMatch[1] : line.trim();
+        const beforeUrl = urlMatch ? line.slice(0, urlMatch.index).trim() : '';
+
         // The preceding buffered lines are cafeName and title
         if (buffer.length >= 2) {
           entries.push({
             cafeName: buffer[buffer.length - 2],
-            title: buffer[buffer.length - 1],
+            title: beforeUrl || buffer[buffer.length - 1],
             url,
             platform: detectPlatform(url),
           });
         } else if (buffer.length === 1) {
           entries.push({
+            cafeName: beforeUrl ? buffer[0] : '',
+            title: beforeUrl || buffer[0],
+            url,
+            platform: detectPlatform(url),
+          });
+        } else if (beforeUrl) {
+          // 한 줄에 "제목 URL" 형식
+          entries.push({
             cafeName: '',
-            title: buffer[0],
+            title: beforeUrl,
             url,
             platform: detectPlatform(url),
           });
