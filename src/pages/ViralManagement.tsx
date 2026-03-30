@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   PieChart,
@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 import StatCard from '../components/dashboard/StatCard';
 import { fetchViralDashboard, type ViralDashboardStats } from '../services/dashboard';
-import { fetchVirals, verifyViral, bulkVerify } from '../services/virals';
+import { fetchVirals, verifyViral, deleteViral as deleteViralApi } from '../services/virals';
 import type { Viral } from '../types';
 
 const statusBadge = (status: string, result: string | null) => {
@@ -54,10 +54,19 @@ export default function ViralManagement() {
   const [stats, setStats] = useState<ViralDashboardStats | null>(null);
   const [virals, setVirals] = useState<Viral[]>([]);
   const [loading, setLoading] = useState(true);
-  const [verifying, setVerifying] = useState<string | null>(null); // viral id being verified
+  const [verifying, setVerifying] = useState<string | null>(null);
   const [bulkVerifying, setBulkVerifying] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const navigate = useNavigate();
   const { id } = useParams();
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, type });
+    toastTimer.current = setTimeout(() => setToast(null), 4000);
+  };
 
   const loadData = () => {
     if (!id) return;
@@ -85,22 +94,54 @@ export default function ViralManagement() {
     try {
       const updated = await verifyViral(id, viralId);
       setVirals((prev) => prev.map((v) => (v.id === viralId ? updated : v)));
-      // Refresh stats
       fetchViralDashboard(id).then(setStats).catch(() => {});
-    } catch {} finally {
+      const label = updated.verification.result === 'ok' ? '적합' : updated.verification.result === 'warning' ? '경고' : '부적합';
+      showToast(`검증 완료: ${label} (${updated.verification.score}점)`);
+    } catch {
+      showToast('검증 실패. 다시 시도해주세요.', 'error');
+    } finally {
       setVerifying(null);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, viralId: string, title: string) => {
+    e.stopPropagation();
+    if (!id) return;
+    if (!confirm(`"${title}" 바이럴을 삭제하시겠습니까?`)) return;
+    try {
+      await deleteViralApi(id, viralId);
+      setVirals((prev) => prev.filter((v) => v.id !== viralId));
+      fetchViralDashboard(id).then(setStats).catch(() => {});
+      showToast('삭제 완료');
+    } catch {
+      showToast('삭제 실패', 'error');
     }
   };
 
   const handleBulkVerify = async () => {
     if (!id) return;
+    const targets = virals.filter((v) => v.status === 'pending');
+    const targetList = targets.length > 0 ? targets : virals;
     setBulkVerifying(true);
-    try {
-      await bulkVerify(id, {});
-      loadData();
-    } catch {} finally {
-      setBulkVerifying(false);
+    setBulkProgress({ done: 0, total: targetList.length });
+
+    let successCount = 0;
+    let errorCount = 0;
+    for (const viral of targetList) {
+      try {
+        const updated = await verifyViral(id, viral.id);
+        setVirals((prev) => prev.map((v) => (v.id === viral.id ? updated : v)));
+        successCount++;
+      } catch {
+        errorCount++;
+      }
+      setBulkProgress((p) => ({ ...p, done: p.done + 1 }));
     }
+
+    fetchViralDashboard(id).then(setStats).catch(() => {});
+    setBulkVerifying(false);
+    setBulkProgress({ done: 0, total: 0 });
+    showToast(`검증 완료: 성공 ${successCount}건${errorCount > 0 ? `, 실패 ${errorCount}건` : ''}`);
   };
 
   const pendingCount = virals.filter((v) => v.status === 'pending').length;
@@ -145,6 +186,19 @@ export default function ViralManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all animate-[slideIn_0.3s_ease-out] ${
+            toast.type === 'success'
+              ? 'bg-emerald-600 text-white'
+              : 'bg-red-600 text-white'
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-4">
         <StatCard
@@ -156,7 +210,7 @@ export default function ViralManagement() {
         />
         <StatCard
           title="검증완료"
-          value={`${stats?.verifiedCount ?? 0}건`}
+          value={`${(stats?.verifiedCount ?? 0) + (stats?.failedCount ?? 0)}건`}
           subtitle={`검증 진행률 ${stats && stats.totalVirals > 0 ? Math.round(((stats.verifiedCount + stats.failedCount) / stats.totalVirals) * 100) : 0}%`}
           trend="up"
           color="green"
@@ -179,28 +233,28 @@ export default function ViralManagement() {
           icon="💬"
         />
         <StatCard
-          title="마지막 업데이트"
-          value={stats?.lastUpdated ? timeSince(stats.lastUpdated) : '-'}
-          subtitle={stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleString('ko-KR') : ''}
+          title="마지막 검증일"
+          value={stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+          subtitle={stats?.lastUpdated ? timeSince(stats.lastUpdated) : ''}
           color="zinc"
           icon="⏰"
         />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Donut Chart */}
+      {/* Charts — 파이 축소, 부적합 원인 확대 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Donut Chart — 1칸 */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5">
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">검증결과 분포</h3>
           {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie
                   data={pieData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={40}
-                  outerRadius={70}
+                  innerRadius={35}
+                  outerRadius={60}
                   paddingAngle={3}
                   dataKey="value"
                   stroke="none"
@@ -228,18 +282,18 @@ export default function ViralManagement() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-60 text-zinc-600 text-sm">
+            <div className="flex items-center justify-center h-44 text-zinc-600 text-sm">
               검증 데이터가 없습니다
             </div>
           )}
         </div>
 
-        {/* Bar Chart */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5">
+        {/* Bar Chart — 2칸 */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5 lg:col-span-2">
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">부적합 원인 분석</h3>
           {barData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={barData} layout="vertical" margin={{ left: 10 }}>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={barData} layout="vertical" margin={{ left: 20, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
                 <XAxis type="number" tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} />
                 <YAxis
@@ -248,7 +302,7 @@ export default function ViralManagement() {
                   tick={{ fill: '#a1a1aa', fontSize: 12 }}
                   axisLine={false}
                   tickLine={false}
-                  width={70}
+                  width={120}
                 />
                 <Tooltip
                   contentStyle={{
@@ -263,7 +317,7 @@ export default function ViralManagement() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-60 text-zinc-600 text-sm">
+            <div className="flex items-center justify-center h-44 text-zinc-600 text-sm">
               부적합 데이터가 없습니다
             </div>
           )}
@@ -279,9 +333,18 @@ export default function ViralManagement() {
             <button
               onClick={handleBulkVerify}
               disabled={bulkVerifying}
-              className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+              className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors flex items-center gap-1.5"
             >
-              {bulkVerifying ? '검증 중...' : pendingCount > 0 ? `대기 ${pendingCount}건 검증` : '전체 재검증'}
+              {bulkVerifying ? (
+                <>
+                  <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {`검증 중 ${bulkProgress.done}/${bulkProgress.total}`}
+                </>
+              ) : pendingCount > 0 ? (
+                `대기 ${pendingCount}건 검증`
+              ) : (
+                '전체 재검증'
+              )}
             </button>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -318,9 +381,9 @@ export default function ViralManagement() {
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">플랫폼</th>
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden md:table-cell">작성자</th>
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">상태</th>
-                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">부정댓글</th>
-                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">등록일</th>
-                <th className="w-16"></th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">댓글</th>
+                <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">마지막 검증</th>
+                <th className="w-28"></th>
               </tr>
             </thead>
             <tbody>
@@ -334,36 +397,63 @@ export default function ViralManagement() {
                     {viral.title}
                   </td>
                   <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden sm:table-cell">{viral.platform}</td>
-                  <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden md:table-cell">{viral.author}</td>
+                  <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden md:table-cell">
+                    {viral.author || <span className="text-zinc-600">-</span>}
+                  </td>
                   <td className="py-3 px-2 sm:px-4">
                     {statusBadge(viral.status, viral.verification.result)}
                   </td>
                   <td className="py-3 px-2 sm:px-4">
-                    <span
-                      className={
-                        viral.comments.negativeCount > 0 ? 'text-red-400' : 'text-zinc-600'
-                      }
-                    >
-                      {viral.comments.negativeCount}건
+                    <span className="text-zinc-400">
+                      {viral.comments.totalCount > 0 ? (
+                        <>
+                          {viral.comments.totalCount}건
+                          {viral.comments.negativeCount > 0 && (
+                            <span className="text-red-400 ml-1">({viral.comments.negativeCount})</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-zinc-600">-</span>
+                      )}
                     </span>
                   </td>
-                  <td className="py-3 px-2 sm:px-4 text-zinc-500 hidden sm:table-cell">
-                    {new Date(viral.createdAt).toLocaleDateString('ko-KR')}
+                  <td className="py-3 px-2 sm:px-4 text-zinc-500 hidden sm:table-cell text-xs">
+                    {viral.verification?.checkedAt
+                      ? new Date(viral.verification.checkedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      : <span className="text-zinc-600">-</span>}
                   </td>
                   <td className="py-3 px-2">
-                    <button
-                      onClick={(e) => handleVerifySingle(e, viral.id)}
-                      disabled={verifying === viral.id}
-                      className="text-[10px] sm:text-xs px-2 py-1 bg-blue-600/15 text-blue-400 hover:bg-blue-600 hover:text-white disabled:opacity-50 font-medium rounded transition-colors whitespace-nowrap"
-                    >
-                      {verifying === viral.id ? '...' : viral.status === 'pending' ? '검증' : '재검증'}
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => handleVerifySingle(e, viral.id)}
+                        disabled={verifying === viral.id}
+                        className="text-[10px] sm:text-xs px-2 py-1 bg-blue-600/15 text-blue-400 hover:bg-blue-600 hover:text-white disabled:opacity-50 font-medium rounded transition-colors whitespace-nowrap flex items-center gap-1"
+                      >
+                        {verifying === viral.id ? (
+                          <>
+                            <span className="inline-block w-3 h-3 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                            검증중
+                          </>
+                        ) : viral.status === 'pending' ? (
+                          '검증'
+                        ) : (
+                          '재검증'
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(e, viral.id, viral.title)}
+                        className="text-[10px] sm:text-xs px-1.5 py-1 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                        title="삭제"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
               {filteredVirals.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-zinc-600">
+                  <td colSpan={7} className="py-12 text-center text-zinc-600">
                     해당 필터에 맞는 바이럴이 없습니다.
                   </td>
                 </tr>

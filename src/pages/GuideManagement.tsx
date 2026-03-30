@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { fetchGuides, createGuide, deleteGuide } from '../services/guides';
+import { fetchGuides, createGuide, updateGuide, deleteGuide } from '../services/guides';
 import { fetchProducts, createProduct } from '../services/products';
 import type { Guide, Product, VerificationRule } from '../types';
 
@@ -12,12 +12,29 @@ const DEFAULT_RULES: VerificationRule[] = [
   { ruleId: 'naver_policy', name: '네이버 광고 정책', weight: 10, isAutoFail: true, config: { policyVersion: '2026-03' } },
 ];
 
+function extractFormFromGuide(guide: Guide) {
+  const reqRule = guide.verificationRules.find((r) => r.ruleId === 'required_keywords');
+  const forbRule = guide.verificationRules.find((r) => r.ruleId === 'forbidden_keywords');
+  const toneRule = guide.verificationRules.find((r) => r.ruleId === 'tone_check');
+  const structRule = guide.verificationRules.find((r) => r.ruleId === 'content_structure');
+  return {
+    productId: guide.productId,
+    version: guide.version,
+    customGuidelines: guide.customGuidelines || '',
+    requiredKeywords: (Array.isArray(reqRule?.config?.keywords) ? reqRule.config.keywords : []).join(', '),
+    forbiddenKeywords: (Array.isArray(forbRule?.config?.keywords) ? forbRule.config.keywords : []).join(', '),
+    toneGuide: String(toneRule?.config?.toneGuide || ''),
+    minLength: String(structRule?.config?.minLength || 500),
+  };
+}
+
 export default function GuideManagement() {
   const { id } = useParams();
   const [guides, setGuides] = useState<Guide[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<Guide | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -57,6 +74,30 @@ export default function GuideManagement() {
   const productName = (productId: string) =>
     products.find((p) => p.id === productId)?.name ?? productId;
 
+  const openCreate = () => {
+    setEditTarget(null);
+    setPdfFile(null);
+    setError('');
+    setForm({
+      productId: products[0]?.id || '',
+      version: '1.0',
+      customGuidelines: '',
+      requiredKeywords: '',
+      forbiddenKeywords: '',
+      toneGuide: '',
+      minLength: '500',
+    });
+    setShowModal(true);
+  };
+
+  const openEdit = (guide: Guide) => {
+    setEditTarget(guide);
+    setPdfFile(null);
+    setError('');
+    setForm(extractFormFromGuide(guide));
+    setShowModal(true);
+  };
+
   const handleDeleteGuide = async () => {
     if (!id || !deleteTarget) return;
     try {
@@ -86,38 +127,50 @@ export default function GuideManagement() {
     }
   };
 
-  const handleCreate = async () => {
+  const buildRules = (): VerificationRule[] => {
+    const base = editTarget ? editTarget.verificationRules : DEFAULT_RULES;
+    return base.map((r) => {
+      if (r.ruleId === 'required_keywords') {
+        const kw = form.requiredKeywords.split(',').map((k) => k.trim()).filter(Boolean);
+        return { ...r, config: { keywords: kw, minMatch: Math.max(1, Math.ceil(kw.length * 0.6)) } };
+      }
+      if (r.ruleId === 'forbidden_keywords') {
+        return { ...r, config: { keywords: form.forbiddenKeywords.split(',').map((k) => k.trim()).filter(Boolean) } };
+      }
+      if (r.ruleId === 'tone_check') {
+        return { ...r, config: { toneGuide: form.toneGuide || '자연스러운 후기 톤, 과장 금지' } };
+      }
+      if (r.ruleId === 'content_structure') {
+        return { ...r, config: { requireImages: true, requirePurchaseLink: false, minLength: parseInt(form.minLength) || 500 } };
+      }
+      return r;
+    });
+  };
+
+  const handleSubmit = async () => {
     if (!id || !form.productId) return;
     setSubmitting(true);
     setError('');
     try {
-      const rules: VerificationRule[] = DEFAULT_RULES.map((r) => {
-        if (r.ruleId === 'required_keywords') {
-          const kw = form.requiredKeywords.split(',').map((k) => k.trim()).filter(Boolean);
-          return { ...r, config: { keywords: kw, minMatch: Math.max(1, Math.ceil(kw.length * 0.6)) } };
-        }
-        if (r.ruleId === 'forbidden_keywords') {
-          return { ...r, config: { keywords: form.forbiddenKeywords.split(',').map((k) => k.trim()).filter(Boolean) } };
-        }
-        if (r.ruleId === 'tone_check') {
-          return { ...r, config: { toneGuide: form.toneGuide || '자연스러운 후기 톤, 과장 금지' } };
-        }
-        if (r.ruleId === 'content_structure') {
-          return { ...r, config: { requireImages: true, requirePurchaseLink: false, minLength: parseInt(form.minLength) || 500 } };
-        }
-        return r;
-      });
-
-      await createGuide(id, {
-        productId: form.productId,
-        version: form.version,
-        verificationRules: rules,
-        customGuidelines: form.customGuidelines,
-        isTemplate: false,
-      }, pdfFile || undefined);
+      const rules = buildRules();
+      if (editTarget) {
+        await updateGuide(id, editTarget.id, {
+          productId: form.productId,
+          version: form.version,
+          verificationRules: rules,
+          customGuidelines: form.customGuidelines,
+        });
+      } else {
+        await createGuide(id, {
+          productId: form.productId,
+          version: form.version,
+          verificationRules: rules,
+          customGuidelines: form.customGuidelines,
+          isTemplate: false,
+        }, pdfFile || undefined);
+      }
       setShowModal(false);
       setPdfFile(null);
-      setForm({ productId: products[0]?.id || '', version: '1.0', customGuidelines: '', requiredKeywords: '', forbiddenKeywords: '', toneGuide: '', minLength: '500' });
       loadData();
     } catch (e) {
       setError((e as Error).message);
@@ -143,10 +196,7 @@ export default function GuideManagement() {
           <p className="text-sm text-zinc-500 mt-1">바이럴 검증 가이드를 관리합니다</p>
         </div>
         <button
-          onClick={() => {
-            if (products.length > 0) setForm((f) => ({ ...f, productId: products[0].id }));
-            setShowModal(true);
-          }}
+          onClick={openCreate}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
         >
           + 가이드 등록
@@ -165,7 +215,7 @@ export default function GuideManagement() {
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">규칙</th>
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium">상태</th>
                 <th className="text-left py-3 px-2 sm:px-4 text-zinc-500 font-medium hidden sm:table-cell">수정일</th>
-                <th className="w-10"></th>
+                <th className="w-20"></th>
               </tr>
             </thead>
             <tbody>
@@ -207,15 +257,26 @@ export default function GuideManagement() {
                       {new Date(guide.updatedAt).toLocaleDateString('ko-KR')}
                     </td>
                     <td className="py-3 px-2">
-                      <button
-                        onClick={() => setDeleteTarget(guide)}
-                        className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                        title="삭제"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                          <path d="M4 4l8 8M12 4l-8 8" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEdit(guide)}
+                          className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-blue-400 hover:bg-blue-500/10 transition-all"
+                          title="수정"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11.5 1.5l3 3L5 14H2v-3z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(guide)}
+                          className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                          title="삭제"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                            <path d="M4 4l8 8M12 4l-8 8" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -225,11 +286,11 @@ export default function GuideManagement() {
         </div>
       </div>
 
-      {/* Create Guide Modal */}
+      {/* Create/Edit Guide Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowModal(false)}>
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 sm:p-6 w-full max-w-lg mx-3 sm:mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-zinc-100 mb-4">가이드 등록</h2>
+            <h2 className="text-lg font-bold text-zinc-100 mb-4">{editTarget ? '가이드 수정' : '가이드 등록'}</h2>
 
             {error && (
               <div className="mb-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
@@ -332,43 +393,51 @@ export default function GuideManagement() {
                   className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </label>
-              {/* PDF Upload */}
-              <div className="block">
-                <span className="text-sm text-zinc-400">가이드 PDF 업로드</span>
-                <input
-                  ref={pdfInputRef}
-                  type="file"
-                  accept=".pdf"
-                  className="hidden"
-                  onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
-                />
-                <div
-                  onClick={() => pdfInputRef.current?.click()}
-                  className="mt-1 border border-dashed border-zinc-700 rounded-lg p-4 sm:p-6 text-center cursor-pointer hover:border-zinc-500 transition-colors"
-                >
-                  {pdfFile ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-red-400 text-lg">📄</span>
-                      <div className="text-left">
-                        <p className="text-sm text-blue-400 font-medium truncate max-w-[200px]">{pdfFile.name}</p>
-                        <p className="text-xs text-zinc-500">{(pdfFile.size / 1024).toFixed(1)} KB</p>
+              {/* PDF Upload — 신규 등록시만 */}
+              {!editTarget && (
+                <div className="block">
+                  <span className="text-sm text-zinc-400">가이드 PDF 업로드</span>
+                  <input
+                    ref={pdfInputRef}
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+                  />
+                  <div
+                    onClick={() => pdfInputRef.current?.click()}
+                    className="mt-1 border border-dashed border-zinc-700 rounded-lg p-4 sm:p-6 text-center cursor-pointer hover:border-zinc-500 transition-colors"
+                  >
+                    {pdfFile ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-red-400 text-lg">📄</span>
+                        <div className="text-left">
+                          <p className="text-sm text-blue-400 font-medium truncate max-w-[200px]">{pdfFile.name}</p>
+                          <p className="text-xs text-zinc-500">{(pdfFile.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setPdfFile(null); if (pdfInputRef.current) pdfInputRef.current.value = ''; }}
+                          className="ml-2 text-zinc-500 hover:text-red-400"
+                        >
+                          ✕
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setPdfFile(null); if (pdfInputRef.current) pdfInputRef.current.value = ''; }}
-                        className="ml-2 text-zinc-500 hover:text-red-400"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-sm text-zinc-400">블로거에게 전달하는 가이드 PDF를 업로드하세요</p>
-                      <p className="text-xs text-zinc-600 mt-1">AI가 내용을 분석하여 바이럴 검증 시 비교합니다</p>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <p className="text-sm text-zinc-400">블로거에게 전달하는 가이드 PDF를 업로드하세요</p>
+                        <p className="text-xs text-zinc-600 mt-1">AI가 내용을 분석하여 바이럴 검증 시 비교합니다</p>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+              {editTarget?.pdfFileName && (
+                <div className="flex items-center gap-2 text-sm text-zinc-400">
+                  <span className="text-red-400">📄</span>
+                  <span>첨부 PDF: {editTarget.pdfFileName}</span>
+                </div>
+              )}
 
               <label className="block">
                 <span className="text-sm text-zinc-400">기타 가이드라인</span>
@@ -390,11 +459,11 @@ export default function GuideManagement() {
                 취소
               </button>
               <button
-                onClick={handleCreate}
+                onClick={handleSubmit}
                 disabled={submitting || !form.productId}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
               >
-                {submitting ? '등록 중...' : '가이드 등록'}
+                {submitting ? '저장 중...' : editTarget ? '수정 완료' : '가이드 등록'}
               </button>
             </div>
           </div>
