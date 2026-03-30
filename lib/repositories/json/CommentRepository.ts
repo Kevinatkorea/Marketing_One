@@ -44,12 +44,11 @@ export class CommentRepository
   }
 
   async create(data: Omit<Comment, 'id' | 'detectedAt'>): Promise<Comment> {
-    const comment: Comment = {
+    return this.insertOneAutoId((id) => ({
       ...data,
-      id: await this.generateId(),
+      id,
       detectedAt: new Date().toISOString(),
-    };
-    return this.insertOne(comment);
+    } as Comment));
   }
 
   async update(

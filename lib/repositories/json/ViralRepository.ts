@@ -76,12 +76,11 @@ export class ViralRepository
   }
 
   async create(data: Omit<Viral, 'id' | 'createdAt'>): Promise<Viral> {
-    const viral: Viral = {
+    return this.insertOneAutoId((id) => ({
       ...data,
-      id: await this.generateId(),
+      id,
       createdAt: new Date().toISOString(),
-    };
-    return this.insertOne(viral);
+    } as Viral));
   }
 
   async update(

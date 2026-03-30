@@ -33,12 +33,11 @@ export class ProductRepository
   }
 
   async create(data: Omit<Product, 'id' | 'createdAt'>): Promise<Product> {
-    const product: Product = {
+    return this.insertOneAutoId((id) => ({
       ...data,
-      id: await this.generateId(),
+      id,
       createdAt: new Date().toISOString(),
-    };
-    return this.insertOne(product);
+    } as Product));
   }
 
   async update(

@@ -35,13 +35,12 @@ export class ProjectRepository
     data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<Project> {
     const now = new Date().toISOString();
-    const project: Project = {
+    return this.insertOneAutoId((id) => ({
       ...data,
-      id: await this.generateId(),
+      id,
       createdAt: now,
       updatedAt: now,
-    };
-    return this.insertOne(project);
+    } as Project));
   }
 
   async update(

@@ -38,28 +38,26 @@ export class GuideRepository
     if (!source) throw new Error(`Guide not found: ${id}`);
 
     const now = new Date().toISOString();
-    const cloned: Guide = {
+    return this.insertOneAutoId((id) => ({
       ...source,
       ...overrides,
-      id: await this.generateId(),
+      id,
       isTemplate: false,
       createdAt: now,
       updatedAt: now,
-    };
-    return this.insertOne(cloned);
+    } as Guide));
   }
 
   async create(
     data: Omit<Guide, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<Guide> {
     const now = new Date().toISOString();
-    const guide: Guide = {
+    return this.insertOneAutoId((id) => ({
       ...data,
-      id: await this.generateId(),
+      id,
       createdAt: now,
       updatedAt: now,
-    };
-    return this.insertOne(guide);
+    } as Guide));
   }
 
   async update(

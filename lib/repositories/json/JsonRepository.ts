@@ -171,6 +171,7 @@ export abstract class JsonRepository<T extends { id: string }> {
   }
 
   protected async generateId(): Promise<string> {
+    // NOTE: 단독 호출 시 race condition 위험. withLock 내부에서 generateIdFromItems()를 직접 사용 권장.
     const items = await this.readAll();
     return this.generateIdFromItems(items);
   }
@@ -198,6 +199,18 @@ export abstract class JsonRepository<T extends { id: string }> {
   protected async insertOne(item: T): Promise<T> {
     return this.withLock(async () => {
       const items = await this.readAllRaw();
+      items.push(item);
+      await this.writeAllRaw(items);
+      return item;
+    });
+  }
+
+  /** ID를 락 내부에서 생성하여 race condition 방지 */
+  protected async insertOneAutoId(buildItem: (id: string) => T): Promise<T> {
+    return this.withLock(async () => {
+      const items = await this.readAllRaw();
+      const id = this.generateIdFromItems(items);
+      const item = buildItem(id);
       items.push(item);
       await this.writeAllRaw(items);
       return item;
