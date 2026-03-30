@@ -21,7 +21,7 @@ export interface VerifyResult {
 }
 
 // Phase A: 사전 체크리스트 (AI 호출 없이 비용 절감)
-function preCheck(crawl: CrawlResult, guide: Guide): { details: VerificationDetail[]; autoFail: boolean } {
+export function preCheck(crawl: CrawlResult, guide: Guide): { details: VerificationDetail[]; autoFail: boolean } {
   const details: VerificationDetail[] = [];
   let autoFail = false;
 
