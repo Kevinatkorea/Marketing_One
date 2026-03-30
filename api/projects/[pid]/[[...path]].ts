@@ -565,6 +565,7 @@ async function route(request: Request): Promise<Response> {
 
     return errorResponse('Not found', 404);
   } catch (err) {
+    console.error('[api] unhandled error:', err);
     return errorResponse(err instanceof Error ? err.message : 'Internal server error', 500);
   }
 }
