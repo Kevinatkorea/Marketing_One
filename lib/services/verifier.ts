@@ -12,6 +12,12 @@ export interface VerifyResult {
   grade: 'green' | 'yellow' | 'red';
   details: VerificationDetail[];
   issues: string[];
+  crawlMeta?: {
+    title: string;
+    charCount: number;
+    imageCount: number;
+    comments: Array<{ author: string; content: string }>;
+  };
 }
 
 // Phase A: 사전 체크리스트 (AI 호출 없이 비용 절감)
@@ -49,12 +55,11 @@ function preCheck(crawl: CrawlResult, guide: Guide): { details: VerificationDeta
       });
       if (!passed && rule.isAutoFail) autoFail = true;
     } else if (rule.ruleId === 'content_structure' || rule.name.includes('구조')) {
-      const requireImages = config.requireImages as boolean;
       const requirePurchaseLink = config.requirePurchaseLink as boolean;
       const minLength = (config.minLength as number) || 300;
 
       const issues: string[] = [];
-      if (requireImages && crawl.imageCount === 0) issues.push('이미지 없음');
+      // 이미지는 크롤링으로 정확히 판단 어려우므로 스킵 (참고 정보만 표시)
       if (requirePurchaseLink && crawl.linkCount === 0) issues.push('링크 없음');
       if (crawl.charCount < minLength) issues.push(`글자수 부족 (${crawl.charCount}/${minLength})`);
 
@@ -189,6 +194,13 @@ export async function verifyViral(url: string, guide: Guide): Promise<VerifyResu
     });
   }
 
+  const crawlMeta = {
+    title: effectiveCrawl.title,
+    charCount: effectiveCrawl.charCount,
+    imageCount: effectiveCrawl.imageCount,
+    comments: effectiveCrawl.comments || [],
+  };
+
   if (autoFail) {
     const totalScore = details.reduce((sum, d) => sum + d.score, 0);
     return {
@@ -197,6 +209,7 @@ export async function verifyViral(url: string, guide: Guide): Promise<VerifyResu
       grade: 'red',
       details,
       issues: details.filter((d) => !d.passed).map((d) => d.note),
+      crawlMeta,
     };
   }
 
@@ -210,10 +223,10 @@ export async function verifyViral(url: string, guide: Guide): Promise<VerifyResu
 
   let result: 'ok' | 'warning' | 'fail';
   let grade: 'green' | 'yellow' | 'red';
-  if (normalizedScore >= 90) {
+  if (normalizedScore >= 80) {
     result = 'ok';
     grade = 'green';
-  } else if (normalizedScore >= 75) {
+  } else if (normalizedScore >= 60) {
     result = 'warning';
     grade = 'yellow';
   } else {
@@ -227,5 +240,6 @@ export async function verifyViral(url: string, guide: Guide): Promise<VerifyResu
     grade,
     details: finalDetails,
     issues: finalDetails.filter((d) => !d.passed).map((d) => d.note),
+    crawlMeta,
   };
 }

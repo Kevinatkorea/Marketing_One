@@ -212,6 +212,22 @@ async function handleVirals(request: Request, pid: string, subPath: string[]): P
     return errorResponse('Method not allowed', 405);
   }
 
+  // --- Debug: raw viral data ---
+  if (segment2 === 'debug' && method(request) === 'GET') {
+    const v = await viralRepo.findById(segment1);
+    return jsonResponse({
+      id: v?.id,
+      hasDetails: (v?.verification?.details?.length ?? 0) > 0,
+      detailsCount: v?.verification?.details?.length,
+      score: v?.verification?.score,
+      result: v?.verification?.result,
+      historyCount: v?.verificationHistory?.length,
+      url: v?.url?.slice(0, 80),
+      verificationType: typeof v?.verification,
+      verificationKeys: v?.verification ? Object.keys(v.verification) : [],
+    });
+  }
+
   // --- Single viral with sub-action ---
   if (segment2 === 'verify' && method(request) === 'POST') {
     return handleViralVerify(segment1);
@@ -407,10 +423,43 @@ async function handleViralVerify(viralId: string): Promise<Response> {
   if (!viral) return errorResponse('Viral not found', 404);
   const guide = viral.guideId ? await guideRepo.findById(viral.guideId) : null;
   if (!guide) return errorResponse('가이드를 찾을 수 없습니다', 400);
-  const result = await runVerification(viral.url, guide);
+
+  console.log('[verify] start', viralId, 'url:', viral.url?.slice(0, 80));
+
+  let result;
+  try {
+    result = await runVerification(viral.url, guide);
+  } catch (err) {
+    console.error('[verify] runVerification failed:', err);
+    return errorResponse(`검증 실행 실패: ${err instanceof Error ? err.message : String(err)}`, 500);
+  }
+
+  console.log('[verify] result:', result.result, 'score:', result.score, 'details:', result.details.length);
+
   const now = new Date().toISOString();
   const attempt = (viral.verificationHistory?.length ?? 0) + 1;
-  const updated = await viralRepo.update(viralId, { status: result.result === 'fail' ? 'failed' : 'verified', verification: { ...result, checkedAt: now }, verificationHistory: [...(viral.verificationHistory || []), { attempt, result: result.result, score: result.score, verifiedAt: now }] });
+  const commentCount = result.crawlMeta?.comments?.length ?? 0;
+
+  // crawlMeta는 verification에 포함하지 않음 (데이터 비대화 방지)
+  const { crawlMeta: _meta, ...verifyData } = result;
+  const updateData: Record<string, unknown> = {
+    status: verifyData.result === 'fail' ? 'failed' : 'verified',
+    verification: { ...verifyData, checkedAt: now },
+    verificationHistory: [...(viral.verificationHistory || []), { attempt, result: verifyData.result, score: verifyData.score, verifiedAt: now }],
+  };
+  if (!viral.title && _meta?.title) {
+    updateData.title = _meta.title;
+  }
+  if (commentCount > 0) {
+    updateData.comments = { totalCount: commentCount, negativeCount: viral.comments?.negativeCount || 0, lastCheckedAt: now };
+  }
+
+  console.log('[verify] saving. details count:', verifyData.details.length, 'issues:', verifyData.issues.length);
+
+  const updated = await viralRepo.update(viralId, updateData);
+
+  console.log('[verify] saved. verification.details in result:', updated.verification?.details?.length);
+
   return jsonResponse(updated);
 }
 
@@ -426,8 +475,11 @@ async function handleViralCommentsCollect(viralId: string): Promise<Response> {
   const crawl = await crawlUrl(viral.url);
   if (!crawl.success) return errorResponse(`크롤링 실패: ${crawl.error}`, 502);
 
-  const lines = crawl.text.split(/\n/).filter((l) => l.trim().length > 5 && l.trim().length < 200);
-  const rawComments = lines.slice(-20).map((l) => ({ author: '익명', content: l.trim() }));
+  // 네이버 API에서 구조화된 댓글이 있으면 우선 사용, 없으면 텍스트 기반 폴백
+  const rawComments = (crawl.comments && crawl.comments.length > 0)
+    ? crawl.comments
+    : crawl.text.split(/\n/).filter((l) => l.trim().length > 5 && l.trim().length < 200)
+        .slice(-20).map((l) => ({ author: '익명', content: l.trim() }));
   if (rawComments.length === 0) return jsonResponse({ message: '수집된 댓글 없음', collected: 0, comments: [] });
 
   const sentiments = await analyzeComments(rawComments);
