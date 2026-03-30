@@ -349,6 +349,28 @@ function isNaverBlog(url: string): boolean {
   return /blog\.naver\.com/.test(url);
 }
 
+/** 프록시 서버를 통한 크롤링 (네이버 IP 차단 대응) */
+async function crawlViaProxy(url: string): Promise<CrawlResult | null> {
+  const proxyUrl = process.env.CRAWLER_PROXY_URL;
+  if (!proxyUrl) return null;
+
+  try {
+    const res = await fetch(`${proxyUrl}/crawl`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.CRAWLER_API_KEY ? { 'x-api-key': process.env.CRAWLER_API_KEY } : {}),
+      },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as CrawlResult;
+  } catch {
+    return null; // 프록시 실패 시 로컬 크롤링으로 폴백
+  }
+}
+
 export async function crawlUrl(rawUrl: string): Promise<CrawlResult> {
   const url = extractUrl(rawUrl);
   if (!url || !url.startsWith('http')) {
@@ -357,6 +379,11 @@ export async function crawlUrl(rawUrl: string): Promise<CrawlResult> {
       error: 'URL이 비어있거나 올바르지 않습니다',
     };
   }
+
+  // 프록시 서버가 설정되어 있으면 우선 사용
+  const proxyResult = await crawlViaProxy(url);
+  if (proxyResult) return proxyResult;
+
   if (isNaverCafe(url)) return crawlNaverCafe(url);
   if (isNaverBlog(url)) return crawlNaverBlog(url);
   return crawlGeneric(url);
