@@ -8,10 +8,13 @@ import {
   errorResponse,
   jsonResponse,
   getQueryParams,
+  checkApiAuth,
 } from '../../lib/api-utils.js';
 
 export async function GET(request: Request): Promise<Response> {
   try {
+    const authErr = checkApiAuth(request);
+    if (authErr) return authErr;
     const params = getQueryParams(request);
     const filters = {
       status: (params.get('status') as 'active' | 'archived') || undefined,
@@ -30,6 +33,8 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    const authErr = checkApiAuth(request);
+    if (authErr) return authErr;
     const body = await parseBody(request);
     const parsed = createProjectSchema.safeParse(body);
     if (!parsed.success) {

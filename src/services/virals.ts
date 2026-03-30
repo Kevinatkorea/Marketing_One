@@ -80,8 +80,12 @@ export async function bulkExcelRegister(
   formData.append('file', file);
   formData.append('productId', productId);
   formData.append('guideId', guideId);
+  const headers: Record<string, string> = {};
+  const apiKey = (import.meta as any).env?.VITE_API_SECRET;
+  if (apiKey) headers['x-api-key'] = apiKey;
   const res = await fetch(`/api/projects/${projectId}/virals/bulk-excel`, {
     method: 'POST',
+    headers,
     body: formData,
   });
   if (!res.ok) {

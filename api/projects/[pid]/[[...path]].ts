@@ -28,6 +28,7 @@ import {
   jsonResponse,
   getPathParam,
   getQueryParams,
+  checkApiAuth,
 } from '../../../lib/api-utils.js';
 import { parseViralText } from '../../../lib/services/textParser.js';
 import { verifyViral as runVerification } from '../../../lib/services/verifier.js';
@@ -547,6 +548,9 @@ export async function DELETE(request: Request): Promise<Response> { return route
 
 async function route(request: Request): Promise<Response> {
   try {
+    const authErr = checkApiAuth(request);
+    if (authErr) return authErr;
+
     const pid = getPathParam(request, 'pid');
     if (!pid) return errorResponse('Project ID is required', 400);
 

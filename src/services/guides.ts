@@ -18,8 +18,12 @@ export async function createGuide(
     const formData = new FormData();
     formData.append('pdf', pdfFile);
     formData.append('data', JSON.stringify(data));
+    const headers: Record<string, string> = {};
+    const apiKey = (import.meta as any).env?.VITE_API_SECRET;
+    if (apiKey) headers['x-api-key'] = apiKey;
     const res = await fetch(`/api/projects/${projectId}/guides`, {
       method: 'POST',
+      headers,
       body: formData,
     });
     if (!res.ok) {

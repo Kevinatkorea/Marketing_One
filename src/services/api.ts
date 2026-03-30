@@ -6,9 +6,16 @@ export class ApiError extends Error {
   }
 }
 
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const apiKey = (import.meta as any).env?.VITE_API_SECRET;
+  if (apiKey) headers['x-api-key'] = apiKey;
+  return headers;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     ...init,
   });
   if (!res.ok) {

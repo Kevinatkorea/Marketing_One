@@ -97,3 +97,18 @@ export function getQueryParams(request: Request): URLSearchParams {
   const url = new URL(request.url);
   return url.searchParams;
 }
+
+/**
+ * API 키 인증 검증.
+ * API_SECRET 환경변수가 설정되어 있으면 x-api-key 헤더와 비교.
+ * 미설정 시 인증 없이 통과 (로컬 개발 호환).
+ */
+export function checkApiAuth(request: Request): Response | null {
+  const secret = process.env.API_SECRET;
+  if (!secret) return null; // 미설정 시 통과
+
+  const apiKey = request.headers.get('x-api-key');
+  if (apiKey === secret) return null; // 인증 성공
+
+  return errorResponse('Unauthorized', 401);
+}
