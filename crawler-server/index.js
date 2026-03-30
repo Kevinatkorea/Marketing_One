@@ -31,17 +31,15 @@ async function getBrowser() {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--single-process',
         '--disable-extensions',
         '--disable-background-networking',
         '--disable-default-apps',
         '--disable-sync',
         '--disable-translate',
         '--no-first-run',
-        '--disable-features=site-per-process',
         '--js-flags=--max-old-space-size=256',
       ],
-      protocolTimeout: 45000,
+      protocolTimeout: 60000,
     });
   }
   return browser;

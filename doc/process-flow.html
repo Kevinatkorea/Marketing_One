@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PerformanceOne - 바이럴 검증 프로세스</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #09090b; color: #e4e4e7; line-height: 1.6;
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center; padding: 48px 24px 32px;
+    border-bottom: 1px solid #27272a;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; color: #f4f4f5; }
+  .header p { color: #71717a; font-size: 14px; margin-top: 8px; }
+  .header .badge {
+    display: inline-block; margin-top: 12px;
+    font-size: 11px; padding: 4px 12px; border-radius: 20px;
+    background: #1d4ed8; color: #dbeafe; font-weight: 600;
+  }
+
+  .container { max-width: 780px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  /* Legend */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 16px; justify-content: center;
+    margin-bottom: 40px; padding: 16px; border-radius: 12px;
+    background: #18181b; border: 1px solid #27272a;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a1a1aa; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Flow */
+  .flow { position: relative; }
+  .flow::before {
+    content: ''; position: absolute; left: 32px; top: 0; bottom: 0;
+    width: 2px; background: linear-gradient(to bottom, #3b82f6, #8b5cf6, #ec4899);
+    border-radius: 1px;
+  }
+
+  /* Step Card */
+  .step {
+    position: relative; margin-bottom: 24px; padding-left: 72px; cursor: pointer;
+  }
+  .step-number {
+    position: absolute; left: 16px; top: 16px;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; z-index: 1;
+    transition: transform 0.2s;
+  }
+  .step:hover .step-number { transform: scale(1.15); }
+
+  .step-card {
+    background: #18181b; border: 1px solid #27272a; border-radius: 12px;
+    padding: 20px; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .step:hover .step-card { border-color: #3f3f46; box-shadow: 0 0 20px rgba(59,130,246,0.05); }
+
+  .step-head { display: flex; align-items: center; justify-content: space-between; }
+  .step-icon { font-size: 20px; margin-right: 10px; }
+  .step-title { font-size: 16px; font-weight: 600; color: #f4f4f5; flex: 1; }
+  .step-toggle {
+    font-size: 18px; color: #52525b; transition: transform 0.3s;
+    width: 24px; text-align: center; flex-shrink: 0;
+  }
+  .step.open .step-toggle { transform: rotate(180deg); color: #3b82f6; }
+
+  .step-summary { margin-top: 8px; font-size: 13px; color: #a1a1aa; }
+  .step-summary .tag {
+    display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 6px;
+    margin-right: 4px; margin-top: 4px; font-weight: 600;
+  }
+  .tag-naver { background: #064e3b; color: #6ee7b7; }
+  .tag-ai { background: #4c1d95; color: #c4b5fd; }
+  .tag-storage { background: #78350f; color: #fcd34d; }
+  .tag-api { background: #1e3a5f; color: #93c5fd; }
+  .tag-autofail { background: #7f1d1d; color: #fca5a5; }
+
+  /* Detail */
+  .step-detail {
+    max-height: 0; overflow: hidden; transition: max-height 0.4s ease;
+  }
+  .step.open .step-detail { max-height: 1200px; }
+
+  .detail-inner {
+    margin-top: 16px; padding-top: 16px; border-top: 1px solid #27272a;
+  }
+  .detail-section { margin-bottom: 14px; }
+  .detail-label { font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .detail-list { list-style: none; }
+  .detail-list li {
+    font-size: 12px; color: #d4d4d8; padding: 4px 0 4px 16px;
+    position: relative;
+  }
+  .detail-list li::before {
+    content: ''; position: absolute; left: 0; top: 11px;
+    width: 6px; height: 6px; border-radius: 50%; background: #3f3f46;
+  }
+  .detail-file {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 11px; color: #60a5fa; background: #1e293b;
+    padding: 2px 6px; border-radius: 4px;
+  }
+  .detail-endpoint {
+    font-family: monospace; font-size: 11px; color: #34d399;
+    background: #064e3b33; padding: 2px 6px; border-radius: 4px;
+  }
+
+  /* Connector arrow */
+  .connector {
+    text-align: center; padding: 4px 0 4px 72px; color: #3f3f46; font-size: 18px;
+  }
+
+  /* Branch */
+  .branch-box {
+    margin-top: 12px; padding: 12px; border-radius: 8px;
+    background: #27272a40; border: 1px solid #27272a;
+  }
+  .branch-box h4 { font-size: 12px; font-weight: 600; color: #a1a1aa; margin-bottom: 8px; }
+  .branch-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; font-size: 12px; color: #d4d4d8;
+  }
+  .branch-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Score boxes */
+  .score-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px;
+  }
+  .score-box {
+    padding: 12px; border-radius: 8px; text-align: center;
+    border: 1px solid transparent;
+  }
+  .score-box .label { font-size: 11px; font-weight: 600; }
+  .score-box .range { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  .score-green { background: #064e3b33; border-color: #065f46; }
+  .score-green .label { color: #6ee7b7; }
+  .score-green .range { color: #34d399; }
+  .score-yellow { background: #78350f33; border-color: #92400e; }
+  .score-yellow .label { color: #fcd34d; }
+  .score-yellow .range { color: #fbbf24; }
+  .score-red { background: #7f1d1d33; border-color: #991b1b; }
+  .score-red .label { color: #fca5a5; }
+  .score-red .range { color: #f87171; }
+
+  /* Data flow arrow */
+  .data-flow {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    font-size: 11px; color: #71717a;
+  }
+  .data-flow .arrow { color: #3b82f6; }
+
+  @media (max-width: 640px) {
+    .header h1 { font-size: 22px; }
+    .flow::before { left: 24px; }
+    .step { padding-left: 56px; }
+    .step-number { left: 8px; }
+    .score-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>PerformanceOne</h1>
+  <p>바이럴 검증 프로세스 시스템 아키텍처</p>
+  <span class="badge">v1.0 &mdash; 2026.03</span>
+</div>
+
+<div class="container">
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div>Naver API</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>Claude AI</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fbbf24"></div>JSON Storage</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div>Internal API</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Auto-Fail</div>
+  </div>
+
+  <div class="flow">
+
+    <!-- Step 1 -->
+    <div class="step" onclick="toggle(this)">
+      <div class="step-number" style="background:#1d4ed8; color:#dbeafe;">1</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-icon">📝</span>
+          <span class="step-title">데이터 등록</span>
+          <span class="step-toggle">&#9660;</span>
+        </div>
+        <div class="step-summary">
+          바이럴 URL을 단건/벌크 텍스트/엑셀 3가지 방식으로 등록
+          <br><span class="tag tag-api">POST /api/virals</span>
+          <span class="tag tag-storage">virals.json</span>
+        </div>
+        <div class="step-detail"><div class="detail-inner">
+          <div class="detail-section">
+            <div class="detail-label">등록 방식</div>
+            <ul class="detail-list">
+              <li><strong>단건 등록</strong> &mdash; URL + 제목 + 카페명 직접 입력</li>
+              <li><strong>벌크 텍스트</strong> &mdash; 3줄 반복 / 파이프(|) / 탭 구분 자동 감지</li>
+              <li><strong>엑셀 업로드</strong> &mdash; 카페명, 제목, URL, 작성자, 플랫폼 열</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">자동 처리</div>
+            <ul class="detail-list">
+              <li>플랫폼 자동 감지 (네이버카페, 블로그, 인스타, 유튜브 등 12개)</li>
+              <li>중복 URL 체크 (엑셀 등록 시)</li>
+              <li>배치 ID 자동 부여 (벌크 등록 시)</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">관련 파일</div>
+            <div><span class="detail-file">src/pages/BulkRegistration.tsx</span></div>
+            <div><span class="detail-file">lib/services/textParser.ts</span></div>
+            <div><span class="detail-endpoint">POST /api/projects/:pid/virals/bulk-text</span></div>
+            <div><span class="detail-endpoint">POST /api/projects/:pid/virals/bulk-excel</span></div>
+          </div>
+          <div class="data-flow">
+            사용자 입력 <span class="arrow">&rarr;</span> textParser / ExcelJS <span class="arrow">&rarr;</span> ViralRepository.create() <span class="arrow">&rarr;</span> virals.json
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="connector">&#8595;</div>
+
+    <!-- Step 2 -->
+    <div class="step" onclick="toggle(this)">
+      <div class="step-number" style="background:#059669; color:#d1fae5;">2</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-icon">🌐</span>
+          <span class="step-title">콘텐츠 크롤링</span>
+          <span class="step-toggle">&#9660;</span>
+        </div>
+        <div class="step-summary">
+          등록된 URL에서 본문 텍스트, 이미지, 링크, 댓글을 추출
+          <br><span class="tag tag-naver">Naver API v2.1</span>
+          <span class="tag tag-api">fetch + cheerio</span>
+        </div>
+        <div class="step-detail"><div class="detail-inner">
+          <div class="branch-box">
+            <h4>플랫폼별 크롤링 전략</h4>
+            <div class="branch-item"><div class="branch-dot" style="background:#34d399"></div><strong>네이버 카페</strong> &mdash; cafeName&rarr;clubId 변환 &rarr; v2.1 API (본문+댓글 한번에)</div>
+            <div class="branch-item"><div class="branch-dot" style="background:#34d399"></div><strong>네이버 블로그</strong> &mdash; 모바일 URL 변환 &rarr; fetch + cheerio HTML 파싱</div>
+            <div class="branch-item"><div class="branch-dot" style="background:#60a5fa"></div><strong>기타 사이트</strong> &mdash; 범용 fetch + cheerio (article/main 셀렉터)</div>
+          </div>
+          <div class="detail-section" style="margin-top:14px">
+            <div class="detail-label">추출 데이터 (CrawlResult)</div>
+            <ul class="detail-list">
+              <li><code>title</code> &mdash; 글 제목</li>
+              <li><code>text</code> &mdash; 본문 텍스트 (최대 10,000자)</li>
+              <li><code>imageCount</code> &mdash; 이미지 수</li>
+              <li><code>linkCount</code> &mdash; 링크 수</li>
+              <li><code>comments[]</code> &mdash; {author, content} 배열 (네이버 API)</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">관련 파일</div>
+            <div><span class="detail-file">lib/services/crawler.ts</span></div>
+            <div><span class="detail-endpoint">Naver API: /cafe-articleapi/v2.1/cafes/{id}/articles/{id}</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="connector">&#8595;</div>
+
+    <!-- Step 3 -->
+    <div class="step" onclick="toggle(this)">
+      <div class="step-number" style="background:#d97706; color:#fef3c7;">3</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-icon">&#9989;</span>
+          <span class="step-title">Phase A: 규칙 기반 사전검사</span>
+          <span class="step-toggle">&#9660;</span>
+        </div>
+        <div class="step-summary">
+          AI 호출 없이 키워드/구조 규칙으로 빠르게 사전 검증 (비용 절감)
+          <br><span class="tag tag-autofail">Auto-Fail 가능</span>
+          <span class="tag tag-storage">Guide 규칙 참조</span>
+        </div>
+        <div class="step-detail"><div class="detail-inner">
+          <div class="branch-box">
+            <h4>검사 항목 (VerificationRule)</h4>
+            <div class="branch-item"><div class="branch-dot" style="background:#60a5fa"></div><strong>필수 키워드</strong> (weight: 30) &mdash; 키워드 60% 이상 포함 여부</div>
+            <div class="branch-item"><div class="branch-dot" style="background:#f87171"></div><strong>금지 키워드</strong> (weight: 25, autoFail) &mdash; 금지어 발견 시 즉시 부적합</div>
+            <div class="branch-item"><div class="branch-dot" style="background:#60a5fa"></div><strong>콘텐츠 구조</strong> (weight: 15) &mdash; 이미지/링크/최소 글자수 검사</div>
+          </div>
+          <div class="detail-section" style="margin-top:14px">
+            <div class="detail-label">Auto-Fail 메커니즘</div>
+            <ul class="detail-list">
+              <li>규칙에 <code>isAutoFail: true</code> 설정된 항목이 실패 시</li>
+              <li>Phase B(AI 분석) 건너뛰고 <strong style="color:#f87171">즉시 부적합</strong> 판정</li>
+              <li>AI API 호출 비용 절감 효과</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">관련 파일</div>
+            <div><span class="detail-file">lib/services/verifier.ts</span> &mdash; <code>preCheck()</code> lines 18-84</div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="connector">&#8595; <span style="font-size:11px;color:#71717a">autoFail 아닌 경우</span></div>
+
+    <!-- Step 4 -->
+    <div class="step" onclick="toggle(this)">
+      <div class="step-number" style="background:#7c3aed; color:#ede9fe;">4</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-icon">&#129302;</span>
+          <span class="step-title">Phase B: AI 분석 (Claude)</span>
+          <span class="step-toggle">&#9660;</span>
+        </div>
+        <div class="step-summary">
+          Claude AI가 톤앤매너, 네이버 정책, PDF 가이드 준수를 정밀 분석
+          <br><span class="tag tag-ai">Claude Sonnet</span>
+          <span class="tag tag-autofail">네이버 정책 autoFail</span>
+        </div>
+        <div class="step-detail"><div class="detail-inner">
+          <div class="branch-box">
+            <h4>AI 분석 항목</h4>
+            <div class="branch-item"><div class="branch-dot" style="background:#a78bfa"></div><strong>톤앤매너</strong> (weight: 20) &mdash; 자연스러운 후기 톤, 과장 여부 분석</div>
+            <div class="branch-item"><div class="branch-dot" style="background:#f87171"></div><strong>네이버 광고 정책</strong> (weight: 10, autoFail) &mdash; 광고 표기 누락 등</div>
+            <div class="branch-item"><div class="branch-dot" style="background:#a78bfa"></div><strong>PDF 가이드 비교</strong> &mdash; 업로드된 가이드 PDF 내용과 실제 콘텐츠 대조</div>
+          </div>
+          <div class="detail-section" style="margin-top:14px">
+            <div class="detail-label">AI 입력</div>
+            <ul class="detail-list">
+              <li>크롤링된 콘텐츠 (첫 3,000자)</li>
+              <li>가이드 커스텀 가이드라인</li>
+              <li>PDF 파싱 텍스트 (있을 경우, 첫 3,000자)</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">AI 출력</div>
+            <ul class="detail-list">
+              <li><code>[{ ruleId, passed, scoreRatio: 0.0~1.0, note }]</code></li>
+              <li>각 규칙별 점수 비율 + 판정 사유</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">관련 파일</div>
+            <div><span class="detail-file">lib/services/verifier.ts</span> &mdash; <code>aiAnalysis()</code> lines 87-167</div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="connector">&#8595;</div>
+
+    <!-- Step 5 -->
+    <div class="step" onclick="toggle(this)">
+      <div class="step-number" style="background:#dc2626; color:#fef2f2;">5</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-icon">&#127942;</span>
+          <span class="step-title">점수 산정 & 등급 부여</span>
+          <span class="step-toggle">&#9660;</span>
+        </div>
+        <div class="step-summary">
+          Phase A + B 결과를 합산하여 100점 만점 정규화 점수로 등급 판정
+        </div>
+        <div class="step-detail"><div class="detail-inner">
+          <div class="detail-section">
+            <div class="detail-label">점수 계산 공식</div>
+            <ul class="detail-list">
+              <li><code>totalScore = SUM(각 규칙 score)</code></li>
+              <li><code>maxScore = SUM(각 규칙 weight)</code> (기본 100)</li>
+              <li><code>normalizedScore = (totalScore / maxScore) * 100</code></li>
+            </ul>
+          </div>
+          <div class="score-grid">
+            <div class="score-box score-green">
+              <div class="label">적합 (OK)</div>
+              <div class="range">&ge; 90</div>
+            </div>
+            <div class="score-box score-yellow">
+              <div class="label">경고 (Warning)</div>
+              <div class="range">75~89</div>
+            </div>
+            <div class="score-box score-red">
+              <div class="label">부적합 (Fail)</div>
+              <div class="range">&lt; 75</div>
+            </div>
+          </div>
+          <div class="detail-section" style="margin-top:14px">
+            <div class="detail-label">저장 데이터</div>
+            <ul class="detail-list">
+              <li><code>status</code>: verified / failed</li>
+              <li><code>verification</code>: { result, score, grade, details[], issues[], checkedAt }</li>
+              <li><code>verificationHistory</code>: 매 검증마다 이력 추가</li>
+            </ul>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="connector">&#8595;</div>
+
+    <!-- Step 6 -->
+    <div class="step" onclick="toggle(this)">
+      <div class="step-number" style="background:#0891b2; color:#cffafe;">6</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-icon">&#128172;</span>
+          <span class="step-title">댓글 수집 & 감성 분석</span>
+          <span class="step-toggle">&#9660;</span>
+        </div>
+        <div class="step-summary">
+          네이버 API로 실제 댓글을 수집하고 Claude AI로 감성/우선순위 분류
+          <br><span class="tag tag-naver">Naver Comment API</span>
+          <span class="tag tag-ai">Claude Sonnet</span>
+          <span class="tag tag-storage">comments.json</span>
+        </div>
+        <div class="step-detail"><div class="detail-inner">
+          <div class="detail-section">
+            <div class="detail-label">댓글 수집</div>
+            <ul class="detail-list">
+              <li>네이버 카페: v2.1 API 응답에 포함 (20개 이하) / v3 페이지네이션 (20+)</li>
+              <li>기타: 크롤링 텍스트 기반 폴백</li>
+              <li>작성자 닉네임 + 댓글 내용 구조화</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">AI 감성 분석 결과</div>
+            <ul class="detail-list">
+              <li><strong>감성</strong>: positive / neutral / negative (-1.0 ~ 1.0)</li>
+              <li><strong>카테고리</strong>: 긍정반응, 일반질문, 광고의심, 불만, 거짓정보, 신상노출, 스팸</li>
+              <li><strong>우선순위</strong>: immediate &rarr; high &rarr; monitor &rarr; ignore</li>
+              <li><strong>대응 필요</strong>: responseRequired boolean</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">관련 파일</div>
+            <div><span class="detail-file">lib/services/crawler.ts</span> &mdash; 댓글 추출</div>
+            <div><span class="detail-file">lib/services/sentiment.ts</span> &mdash; AI 감성 분석</div>
+            <div><span class="detail-endpoint">POST /api/projects/:pid/virals/:id/comments</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="connector">&#8595;</div>
+
+    <!-- Step 7 -->
+    <div class="step" onclick="toggle(this)">
+      <div class="step-number" style="background:#e11d48; color:#fff1f2;">7</div>
+      <div class="step-card">
+        <div class="step-head">
+          <span class="step-icon">&#128202;</span>
+          <span class="step-title">대시보드 집계 & 표시</span>
+          <span class="step-toggle">&#9660;</span>
+        </div>
+        <div class="step-summary">
+          전체 바이럴 데이터를 집계하여 실시간 대시보드에 시각화
+          <br><span class="tag tag-api">GET /dashboard/viral</span>
+        </div>
+        <div class="step-detail"><div class="detail-inner">
+          <div class="detail-section">
+            <div class="detail-label">집계 항목</div>
+            <ul class="detail-list">
+              <li><strong>통계 카드</strong>: 총 바이럴, 검증완료, 적합률, 부정댓글, 마지막 검증일</li>
+              <li><strong>파이차트</strong>: 적합/경고/부적합 분포</li>
+              <li><strong>바차트</strong>: 부적합 원인별 카운트 (issues 집계)</li>
+              <li><strong>목록</strong>: 필터링 (전체/적합/경고/부적합/대기)</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">사용자 액션</div>
+            <ul class="detail-list">
+              <li>개별 검증 / 재검증 &mdash; 스피너 + "검증중" + 토스트 알림</li>
+              <li>전체 재검증 &mdash; 진행률 표시 (2/5) + 완료 토스트</li>
+              <li>댓글 수집 &mdash; 감성 분석 결과 뱃지 표시</li>
+              <li>바이럴 삭제 &mdash; 확인 다이얼로그</li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">관련 파일</div>
+            <div><span class="detail-file">src/pages/ViralManagement.tsx</span> &mdash; 대시보드 + 목록</div>
+            <div><span class="detail-file">src/pages/ViralDetail.tsx</span> &mdash; 상세 + 검증 이력</div>
+            <div><span class="detail-endpoint">GET /api/projects/:pid/dashboard/viral</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+  </div><!-- /flow -->
+
+  <!-- Architecture summary -->
+  <div style="margin-top:48px; padding:24px; background:#18181b; border:1px solid #27272a; border-radius:12px;">
+    <h3 style="font-size:14px; font-weight:600; color:#f4f4f5; margin-bottom:16px;">시스템 아키텍처 요약</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;">
+      <div style="padding:12px; background:#27272a; border-radius:8px;">
+        <div style="font-size:11px; color:#71717a; font-weight:600;">Frontend</div>
+        <div style="font-size:13px; color:#d4d4d8; margin-top:4px;">React 19 + Vite + Tailwind</div>
+      </div>
+      <div style="padding:12px; background:#27272a; border-radius:8px;">
+        <div style="font-size:11px; color:#71717a; font-weight:600;">API</div>
+        <div style="font-size:13px; color:#d4d4d8; margin-top:4px;">Vercel Serverless Functions</div>
+      </div>
+      <div style="padding:12px; background:#27272a; border-radius:8px;">
+        <div style="font-size:11px; color:#71717a; font-weight:600;">AI</div>
+        <div style="font-size:13px; color:#d4d4d8; margin-top:4px;">Claude Sonnet (검증 + 감성)</div>
+      </div>
+      <div style="padding:12px; background:#27272a; border-radius:8px;">
+        <div style="font-size:11px; color:#71717a; font-weight:600;">크롤링</div>
+        <div style="font-size:13px; color:#d4d4d8; margin-top:4px;">Naver API + fetch/cheerio</div>
+      </div>
+      <div style="padding:12px; background:#27272a; border-radius:8px;">
+        <div style="font-size:11px; color:#71717a; font-weight:600;">Storage</div>
+        <div style="font-size:13px; color:#d4d4d8; margin-top:4px;">JSON File (data/*.json)</div>
+      </div>
+      <div style="padding:12px; background:#27272a; border-radius:8px;">
+        <div style="font-size:11px; color:#71717a; font-weight:600;">배포</div>
+        <div style="font-size:13px; color:#d4d4d8; margin-top:4px;">Vercel (단일 배포)</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggle(el) {
+  el.classList.toggle('open');
+}
+// Auto-open first step
+document.querySelector('.step')?.classList.add('open');
+</script>
+
+</body>
+</html>
