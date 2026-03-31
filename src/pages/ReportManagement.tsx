@@ -6,14 +6,11 @@ import {
 } from 'recharts';
 import {
   uploadMetaCsv, fetchReportUploads, deleteReportUpload,
-  fetchReportSummary, fetchBranchReports, fetchBranchDetail,
+  fetchReportSummary, fetchBranchReports,
   fetchMappingConfig, updateMappingConfig, fetchAvailableMonths,
   type ReportSummaryResponse, type UploadResult,
 } from '../services/reports';
-import type {
-  AdReportUpload, AdMappingConfig, BranchSummary,
-  AdMappingBranch, AdMappingTargetKeyword, AdMappingCreativePattern,
-} from '../types';
+import type { AdReportUpload, AdMappingConfig, BranchSummary } from '../types';
 
 const mainTabs = [
   { key: 'upload', label: 'CSV 업로드' },
@@ -326,7 +323,7 @@ function SummaryTab({ projectId }: { projectId: string }) {
               <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
               <XAxis type="number" tick={{ fill: '#a1a1aa', fontSize: 12 }} />
               <YAxis dataKey="branch" type="category" tick={{ fill: '#a1a1aa', fontSize: 12 }} width={55} />
-              <Tooltip contentStyle={{ backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: 8 }} formatter={(v: number) => won(v)} />
+              <Tooltip contentStyle={{ backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: 8 }} formatter={(v) => won(v as number)} />
               <Legend />
               <Bar dataKey="cost" name="광고비" fill="#3b82f6" radius={[0, 4, 4, 0]} />
               <Bar dataKey="registrations" name="신청완료" fill="#10b981" radius={[0, 4, 4, 0]} />
