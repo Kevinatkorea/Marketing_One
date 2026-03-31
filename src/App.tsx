@@ -2,11 +2,10 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import Layout from './components/common/Layout';
 import ProjectList from './pages/ProjectList';
 import ProjectDashboard from './pages/ProjectDashboard';
-import ViralManagement from './pages/ViralManagement';
-import GuideManagement from './pages/GuideManagement';
-import BulkRegistration from './pages/BulkRegistration';
+import ViralHub from './pages/ViralHub';
 import ViralDetail from './pages/ViralDetail';
 import ProductManagement from './pages/ProductManagement';
+import ReportManagement from './pages/ReportManagement';
 
 const router = createBrowserRouter([
   {
@@ -27,23 +26,19 @@ const router = createBrowserRouter([
       },
       {
         path: 'viral',
-        element: <ViralManagement />,
+        element: <ViralHub />,
       },
       {
-        path: 'viral/guides',
-        element: <GuideManagement />,
+        path: 'viral/:vid',
+        element: <ViralDetail />,
       },
       {
         path: 'products',
         element: <ProductManagement />,
       },
       {
-        path: 'viral/bulk',
-        element: <BulkRegistration />,
-      },
-      {
-        path: 'viral/:vid',
-        element: <ViralDetail />,
+        path: 'reports',
+        element: <ReportManagement />,
       },
     ],
   },

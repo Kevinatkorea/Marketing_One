@@ -3,9 +3,8 @@ import { useState } from 'react';
 
 const navItems = [
   { to: 'products', label: '상품/서비스 관리', icon: '📦' },
-  { to: 'viral/guides', label: '가이드 관리', icon: '📝' },
-  { to: 'viral', label: '바이럴 관리', icon: '📋' },
-  { to: 'viral/bulk', label: '바이럴 등록', icon: '🔗' },
+  { to: 'viral', label: '바이럴', icon: '📋' },
+  { to: 'reports', label: '운영보고서', icon: '📊' },
 ];
 
 export default function Sidebar() {
@@ -114,16 +113,6 @@ export default function Sidebar() {
             </NavLink>
           ))}
 
-          <div className="h-px bg-zinc-800 my-3" />
-
-          {/* Report - Phase 1.5 */}
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-600 cursor-not-allowed">
-            <span className="text-base">📊</span>
-            <span>리포트</span>
-            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
-              곧 출시
-            </span>
-          </div>
         </nav>
 
         {/* Footer */}

@@ -124,3 +124,21 @@ export const createCommentSchema = z.object({
   })).optional().default([]),
   originalDate: z.string().optional().default(''),
 });
+
+// --- Ad Report (운영보고서) ---
+
+export const adMappingConfigSchema = z.object({
+  branches: z.array(z.object({
+    suffix: z.string().min(1),
+    fullName: z.string().min(1),
+  })),
+  targetKeywords: z.array(z.object({
+    keyword: z.string().min(1),
+    label: z.string().min(1),
+  })),
+  creativePatterns: z.array(z.object({
+    pattern: z.string().min(1),
+    label: z.string().min(1),
+  })),
+  categoryDefault: z.string().optional().default('META'),
+});

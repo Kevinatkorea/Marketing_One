@@ -4,3 +4,6 @@ export { ProductRepository } from './ProductRepository.js';
 export { GuideRepository } from './GuideRepository.js';
 export { ViralRepository } from './ViralRepository.js';
 export { CommentRepository } from './CommentRepository.js';
+export { AdReportRepository } from './AdReportRepository.js';
+export { AdReportUploadRepository } from './AdReportUploadRepository.js';
+export { AdMappingConfigRepository } from './AdMappingConfigRepository.js';

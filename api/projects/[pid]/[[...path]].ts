@@ -11,6 +11,9 @@ import {
   guideRepo,
   viralRepo,
   commentRepo,
+  adReportRepo,
+  adReportUploadRepo,
+  adMappingConfigRepo,
 } from '../../../lib/repositories/index.js';
 import {
   updateProjectSchema,
@@ -21,6 +24,7 @@ import {
   createViralSchema,
   updateViralSchema,
   bulkTextSchema,
+  adMappingConfigSchema,
 } from '../../../lib/validations.js';
 import {
   parseBody,
@@ -36,6 +40,13 @@ import { crawlUrl } from '../../../lib/services/crawler.js';
 import { analyzeComments } from '../../../lib/services/sentiment.js';
 import ExcelJS from 'exceljs';
 import type { ViralFilters } from '../../../src/types/index.js';
+import {
+  parseCsvText,
+  transformRow,
+  aggregateByMonth,
+  aggregateByBranch,
+  aggregateByWeek,
+} from '../../../lib/services/adReportMapper.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -538,6 +549,236 @@ async function handleDashboard(_request: Request, pid: string): Promise<Response
 }
 
 // ---------------------------------------------------------------------------
+// Reports (운영보고서)  /api/projects/:pid/reports/...
+// ---------------------------------------------------------------------------
+
+async function handleReports(request: Request, pid: string, subPath: string[]): Promise<Response> {
+  const segment1 = subPath[1]; // upload, uploads, summary, branches, raw, mapping-config, months
+  const segment2 = subPath[2]; // uploadId or branch name
+
+  if (segment1 === 'upload' && method(request) === 'POST') {
+    return handleReportUpload(request, pid);
+  }
+  if (segment1 === 'uploads') {
+    if (!segment2 && method(request) === 'GET') {
+      return jsonResponse(await adReportUploadRepo.listByProject(pid));
+    }
+    if (segment2 && method(request) === 'DELETE') {
+      const upload = await adReportUploadRepo.findById(segment2);
+      if (!upload || upload.projectId !== pid) return errorResponse('Upload not found', 404);
+      await adReportRepo.deleteByUploadBatch(segment2);
+      await adReportUploadRepo.deleteById(segment2);
+      return jsonResponse({ message: '삭제 완료' });
+    }
+    return errorResponse('Method not allowed', 405);
+  }
+  if (segment1 === 'summary' && method(request) === 'GET') {
+    return handleReportSummary(request, pid);
+  }
+  if (segment1 === 'branches' && method(request) === 'GET') {
+    return handleBranchReport(request, pid, segment2);
+  }
+  if (segment1 === 'raw' && method(request) === 'GET') {
+    return handleRawData(request, pid);
+  }
+  if (segment1 === 'mapping-config') {
+    if (method(request) === 'GET') {
+      return jsonResponse(await adMappingConfigRepo.getOrCreate(pid));
+    }
+    if (method(request) === 'PUT') {
+      const body = await parseBody(request);
+      const parsed = adMappingConfigSchema.safeParse(body);
+      if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
+      return jsonResponse(await adMappingConfigRepo.upsert(pid, parsed.data));
+    }
+    return errorResponse('Method not allowed', 405);
+  }
+  if (segment1 === 'months' && method(request) === 'GET') {
+    return jsonResponse(await adReportRepo.getDistinctMonths(pid));
+  }
+
+  return errorResponse('Not found', 404);
+}
+
+async function handleReportUpload(request: Request, pid: string): Promise<Response> {
+  const formData = await request.formData();
+  const file = formData.get('file') as File | null;
+  const mode = (formData.get('mode') as string) || 'append';
+  if (!file) return errorResponse('CSV/XLSX 파일이 필요합니다', 400);
+
+  const config = await adMappingConfigRepo.getOrCreate(pid);
+  const uploadBatchId = `adru_upload_${Date.now()}`;
+
+  // Parse file
+  let text: string;
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.csv') || name.endsWith('.tsv') || name.endsWith('.txt')) {
+    text = await file.text();
+  } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await file.arrayBuffer() as ExcelJS.Buffer);
+    const ws = wb.worksheets[0];
+    if (!ws) return errorResponse('워크시트를 찾을 수 없습니다', 400);
+    // Convert to CSV text
+    const lines: string[] = [];
+    ws.eachRow((row) => {
+      const vals = [];
+      for (let c = 1; c <= (row.cellCount || 20); c++) {
+        vals.push(String(row.getCell(c).value ?? ''));
+      }
+      lines.push(vals.join('\t'));
+    });
+    text = lines.join('\n');
+  } else {
+    return errorResponse('지원하지 않는 파일 형식입니다 (.csv, .xlsx)', 400);
+  }
+
+  let rows;
+  try {
+    rows = parseCsvText(text);
+  } catch (e) {
+    return errorResponse(`파싱 실패: ${(e as Error).message}`, 400);
+  }
+
+  if (rows.length === 0) {
+    return errorResponse('파싱된 데이터가 없습니다. 컬럼명을 확인해주세요.', 400);
+  }
+
+  // Upload record
+  const uploadRecord = await adReportUploadRepo.create({
+    projectId: pid,
+    fileName: file.name,
+    uploadedAt: new Date().toISOString(),
+    rowCount: rows.length,
+    processedCount: 0,
+    errorCount: 0,
+    errors: [],
+    dateRange: { start: '', end: '' },
+    status: 'processing',
+  });
+
+  // Transform rows
+  const successEntries: Parameters<typeof adReportRepo.bulkInsert>[0] = [];
+  const errors: Array<{ row: number; field: string; message: string }> = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const result = transformRow(rows[i], config, pid, uploadBatchId);
+    if (result.entry) {
+      successEntries.push(result.entry);
+    } else {
+      errors.push({ row: i + 2, field: 'mapping', message: result.error || '알 수 없는 오류' });
+    }
+  }
+
+  // Replace mode: delete existing entries for overlapping months
+  if (mode === 'replace' && successEntries.length > 0) {
+    const months = new Set(successEntries.map((e) => e.month));
+    const existing = await adReportRepo.findAll({ projectId: pid });
+    const toDelete = existing.filter((e) => months.has(e.month));
+    if (toDelete.length > 0) {
+      // Delete by overwriting filtered list
+      for (const month of months) {
+        const all = await adReportRepo.findAll({ projectId: pid, month });
+        for (const item of all) {
+          await adReportRepo.deleteById(item.id);
+        }
+      }
+    }
+  }
+
+  // Bulk insert
+  if (successEntries.length > 0) {
+    await adReportRepo.bulkInsert(successEntries);
+  }
+
+  // Compute date range
+  const dates = successEntries.map((e) => e.date).filter(Boolean).sort();
+  const dateRange = dates.length > 0
+    ? { start: dates[0], end: dates[dates.length - 1] }
+    : { start: '', end: '' };
+
+  // Update upload record
+  await adReportUploadRepo.updateStatus(uploadRecord.id, {
+    status: 'completed',
+    processedCount: successEntries.length,
+    errorCount: errors.length,
+    errors: errors.slice(0, 100), // 최대 100개 에러만 저장
+    dateRange,
+  });
+
+  return jsonResponse({
+    message: `${successEntries.length}건 처리, ${errors.length}건 오류`,
+    uploadId: uploadRecord.id,
+    summary: {
+      total: rows.length,
+      processed: successEntries.length,
+      errors: errors.length,
+    },
+    errors: errors.slice(0, 20),
+    dateRange,
+  }, 201);
+}
+
+async function handleReportSummary(request: Request, pid: string): Promise<Response> {
+  const params = getQueryParams(request);
+  const month = params.get('month') || undefined;
+
+  const entries = await adReportRepo.findAll({ projectId: pid, month });
+  if (entries.length === 0) {
+    return jsonResponse({ month, totals: null, weeklyBreakdown: [], branchSummary: [], monthlyTrend: [] });
+  }
+
+  const months = aggregateByMonth(entries);
+  const weeks = aggregateByWeek(entries);
+  const branches = aggregateByBranch(entries);
+
+  // 현재 월 or 전체 합계
+  const currentMonth = month ? months.find((m) => m.month === month) : months[months.length - 1];
+
+  return jsonResponse({
+    month: currentMonth?.month,
+    totals: currentMonth || null,
+    weeklyBreakdown: weeks,
+    branchSummary: branches,
+    monthlyTrend: months,
+  });
+}
+
+async function handleBranchReport(request: Request, pid: string, branch?: string): Promise<Response> {
+  const params = getQueryParams(request);
+  const month = params.get('month') || undefined;
+
+  if (branch) {
+    // 단일 지점 상세
+    const decodedBranch = decodeURIComponent(branch);
+    const entries = await adReportRepo.findAll({ projectId: pid, month, branch: decodedBranch });
+    const weeks = aggregateByWeek(entries);
+    const months = aggregateByMonth(entries);
+    return jsonResponse({ branch: decodedBranch, month, weeks, months, totalEntries: entries.length });
+  }
+
+  // 전체 지점 요약
+  const entries = await adReportRepo.findAll({ projectId: pid, month });
+  const branches = aggregateByBranch(entries);
+  return jsonResponse(branches);
+}
+
+async function handleRawData(request: Request, pid: string): Promise<Response> {
+  const params = getQueryParams(request);
+  const month = params.get('month') || undefined;
+  const branch = params.get('branch') || undefined;
+  const page = parseInt(params.get('page') || '1', 10);
+  const pageSize = parseInt(params.get('pageSize') || '50', 10);
+
+  const entries = await adReportRepo.findAll({ projectId: pid, month, branch });
+  const total = entries.length;
+  const sorted = entries.sort((a, b) => b.date.localeCompare(a.date));
+  const data = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+  return jsonResponse({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
+}
+
+// ---------------------------------------------------------------------------
 // Main Router
 // ---------------------------------------------------------------------------
 
@@ -562,6 +803,7 @@ async function route(request: Request): Promise<Response> {
     if (resource === 'guides') return handleGuides(request, pid, subPath);
     if (resource === 'virals') return handleVirals(request, pid, subPath);
     if (resource === 'dashboard') return handleDashboard(request, pid);
+    if (resource === 'reports') return handleReports(request, pid, subPath);
 
     return errorResponse('Not found', 404);
   } catch (err) {

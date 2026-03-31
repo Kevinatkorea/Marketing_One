@@ -180,3 +180,108 @@ export interface CommentFilters {
   responseRequired?: boolean;
   category?: string;
 }
+
+// --- Ad Report (운영보고서) ---
+
+/** 변환된 광고 보고서 1행 (RAW 형식) */
+export interface AdReportEntry {
+  id: string;
+  projectId: string;
+  uploadBatchId: string;
+  month: string;           // "25년 3월"
+  weekNumber: number;      // 1-5
+  category: string;        // "META"
+  adChannel: string;       // "META-서초본점"
+  target: string;          // "잠재-서초본점"
+  creativeName: string;    // "체험권(VIP)"
+  branch: string;          // "서초본점"
+  date: string;            // ISO date
+  campaignGroup: string;   // "META_전환_서초본점"
+  adGroupCreative: string; // 원본 광고그룹/소재명
+  impressions: number;
+  clicks: number;
+  cost: number;            // 매체비용
+  costExVat: number;
+  costInVat: number;
+  registrations: number;   // 신청완료 (등록 + 잠재고객)
+  rawCampaignName: string;
+  rawAdSetName: string;
+  rawAdName: string;
+  createdAt: string;
+}
+
+/** CSV 업로드 이력 */
+export interface AdReportUpload {
+  id: string;
+  projectId: string;
+  fileName: string;
+  uploadedAt: string;
+  rowCount: number;
+  processedCount: number;
+  errorCount: number;
+  errors: Array<{ row: number; field: string; message: string }>;
+  dateRange: { start: string; end: string };
+  status: 'processing' | 'completed' | 'failed';
+}
+
+/** 매핑 설정 (프로젝트별 독립) */
+export interface AdMappingBranch {
+  suffix: string;    // "서초"
+  fullName: string;  // "서초본점"
+}
+
+export interface AdMappingTargetKeyword {
+  keyword: string;   // "잠재고객"
+  label: string;     // "잠재"
+}
+
+export interface AdMappingCreativePattern {
+  pattern: string;   // "체험권.*VIP"
+  label: string;     // "체험권(VIP)"
+}
+
+export interface AdMappingConfig {
+  id: string;
+  projectId: string;
+  branches: AdMappingBranch[];
+  targetKeywords: AdMappingTargetKeyword[];
+  creativePatterns: AdMappingCreativePattern[];
+  categoryDefault: string;
+  updatedAt: string;
+}
+
+/** 집계 결과 */
+export interface ReportMetrics {
+  impressions: number;
+  clicks: number;
+  cost: number;
+  registrations: number;
+  cpm: number | null;
+  ctr: number | null;
+  cpc: number | null;
+  cpa: number | null;
+  cvr: number | null;
+}
+
+export interface MonthSummary extends ReportMetrics {
+  month: string;
+  period: string;
+}
+
+export interface BranchSummary extends ReportMetrics {
+  branch: string;
+}
+
+export interface WeekSummary extends ReportMetrics {
+  weekNumber: number;
+}
+
+export interface AdReportFilters {
+  projectId?: string;
+  month?: string;
+  branch?: string;
+  category?: string;
+  target?: string;
+  dateRange?: { start: string; end: string };
+  uploadBatchId?: string;
+}
