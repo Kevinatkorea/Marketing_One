@@ -253,50 +253,87 @@ export default function ViralDetail() {
         </h2>
 
         {comments.length > 0 ? (
-          <div className="space-y-3">
-            {comments.map((comment) => (
-              <div
-                key={comment.id}
-                className={`p-4 rounded-lg border ${
-                  comment.isNegative
-                    ? 'bg-red-500/5 border-red-500/20'
-                    : 'bg-zinc-800/50 border-zinc-800'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-zinc-300">
-                      {comment.author}
-                    </span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                        comment.sentiment === 'positive'
-                          ? 'bg-emerald-500/15 text-emerald-400'
-                          : comment.sentiment === 'negative'
-                          ? 'bg-red-500/15 text-red-400'
-                          : 'bg-zinc-700/50 text-zinc-400'
-                      }`}
-                    >
-                      {comment.sentiment === 'positive'
-                        ? '긍정'
-                        : comment.sentiment === 'negative'
-                        ? '부정'
-                        : '중립'}
-                    </span>
-                    {comment.priority === 'immediate' && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-red-500/15 text-red-400">
-                        즉시대응
-                      </span>
-                    )}
+          <>
+            {/* 감정 분석 요약 */}
+            {(() => {
+              const pos = comments.filter((c) => c.sentiment === 'positive').length;
+              const neg = comments.filter((c) => c.sentiment === 'negative').length;
+              const neu = comments.filter((c) => c.sentiment === 'neutral').length;
+              const total = comments.length;
+              return (
+                <div className="flex items-center gap-4 mb-4 p-3 rounded-lg bg-zinc-800/30 border border-zinc-800">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span className="text-xs text-zinc-400">긍정 <span className="text-emerald-400 font-medium">{pos}</span></span>
                   </div>
-                  <span className="text-xs text-zinc-600">
-                    {new Date(comment.originalDate).toLocaleString('ko-KR')}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-zinc-500"></span>
+                    <span className="text-xs text-zinc-400">중립 <span className="text-zinc-300 font-medium">{neu}</span></span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    <span className="text-xs text-zinc-400">부정 <span className="text-red-400 font-medium">{neg}</span></span>
+                  </div>
+                  {total > 0 && (
+                    <div className="ml-auto flex h-2 flex-1 max-w-[200px] rounded-full overflow-hidden bg-zinc-700">
+                      {pos > 0 && <div className="bg-emerald-500" style={{ width: `${(pos / total) * 100}%` }} />}
+                      {neu > 0 && <div className="bg-zinc-500" style={{ width: `${(neu / total) * 100}%` }} />}
+                      {neg > 0 && <div className="bg-red-500" style={{ width: `${(neg / total) * 100}%` }} />}
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm text-zinc-400">{comment.content}</p>
-              </div>
-            ))}
-          </div>
+              );
+            })()}
+            <div className="space-y-3">
+              {comments.map((comment) => (
+                <div
+                  key={comment.id}
+                  className={`p-4 rounded-lg border ${
+                    comment.isNegative
+                      ? 'bg-red-500/5 border-red-500/20'
+                      : 'bg-zinc-800/50 border-zinc-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-zinc-300">
+                        {comment.author}
+                      </span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                          comment.sentiment === 'positive'
+                            ? 'bg-emerald-500/15 text-emerald-400'
+                            : comment.sentiment === 'negative'
+                            ? 'bg-red-500/15 text-red-400'
+                            : 'bg-zinc-700/50 text-zinc-400'
+                        }`}
+                      >
+                        {comment.sentiment === 'positive'
+                          ? '긍정'
+                          : comment.sentiment === 'negative'
+                          ? '부정'
+                          : '중립'}
+                      </span>
+                      {comment.isNegative && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-red-500/20 text-red-300">
+                          부정 댓글
+                        </span>
+                      )}
+                      {comment.priority === 'immediate' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-orange-500/15 text-orange-400">
+                          즉시대응
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-zinc-600">
+                      {new Date(comment.originalDate).toLocaleString('ko-KR')}
+                    </span>
+                  </div>
+                  <p className="text-sm text-zinc-400">{comment.content}</p>
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="text-center py-8 text-zinc-600 text-sm">
             수집된 댓글이 없습니다.

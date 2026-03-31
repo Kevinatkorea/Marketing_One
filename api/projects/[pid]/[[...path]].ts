@@ -387,12 +387,22 @@ async function handleBulkVerify(request: Request, pid: string): Promise<Response
 
   if (virals.length === 0) return jsonResponse({ message: '검증할 바이럴이 없습니다', results: [] });
 
+  // 프로젝트 가이드 폴백용
+  const projectGuides = await guideRepo.listByProject(pid);
   const guideCache = new Map();
   const results = [];
   for (const viral of virals) {
     try {
       let guide = guideCache.get(viral.guideId);
-      if (!guide && viral.guideId) { guide = await guideRepo.findById(viral.guideId); if (guide) guideCache.set(viral.guideId, guide); }
+      if (!guide && viral.guideId) {
+        const found = await guideRepo.findById(viral.guideId);
+        // 같은 프로젝트 가이드인지 확인
+        if (found && found.projectId === pid) { guide = found; guideCache.set(viral.guideId, guide); }
+      }
+      if (!guide && projectGuides.length > 0) {
+        guide = projectGuides[0];
+        await viralRepo.update(viral.id, { guideId: guide.id } as any);
+      }
       if (!guide) { results.push({ id: viral.id, title: viral.title, status: 'skipped', reason: '가이드 없음' }); continue; }
       const res = await runVerification(viral.url, guide);
       const now = new Date().toISOString();
@@ -433,8 +443,23 @@ async function handleExportTemplate(): Promise<Response> {
 async function handleViralVerify(viralId: string): Promise<Response> {
   const viral = await viralRepo.findById(viralId);
   if (!viral) return errorResponse('Viral not found', 404);
-  const guide = viral.guideId ? await guideRepo.findById(viral.guideId) : null;
-  if (!guide) return errorResponse('가이드를 찾을 수 없습니다', 400);
+
+  // 가이드 찾기: 지정된 가이드 → 같은 프로젝트 가이드 폴백
+  let guide = viral.guideId ? await guideRepo.findById(viral.guideId) : null;
+  if (guide && guide.projectId !== viral.projectId) {
+    console.log(`[verify] guide ${guide.id} belongs to ${guide.projectId}, not ${viral.projectId}. Fallback.`);
+    guide = null;
+  }
+  if (!guide) {
+    const projectGuides = await guideRepo.listByProject(viral.projectId);
+    guide = projectGuides[0] || null;
+    if (guide) {
+      // 올바른 가이드로 바이럴 업데이트
+      await viralRepo.update(viralId, { guideId: guide.id } as any);
+      console.log(`[verify] auto-assigned guide ${guide.id} to viral ${viralId}`);
+    }
+  }
+  if (!guide) return errorResponse('프로젝트에 등록된 가이드가 없습니다. 가이드를 먼저 생성해주세요.', 400);
 
   console.log('[verify] start', viralId, 'url:', viral.url?.slice(0, 80));
 
