@@ -165,32 +165,40 @@ export default function ViralDetail() {
           </div>
         </div>
 
-        {viral.verification.details.length > 0 ? (
-          <div className="space-y-2">
-            {viral.verification.details.map((detail, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between py-2.5 px-4 rounded-lg bg-zinc-800/50"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
-                      detail.passed
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-red-500/20 text-red-400'
-                    }`}
-                  >
-                    {detail.passed ? '✓' : '✗'}
-                  </span>
-                  <span className="text-sm text-zinc-300">{detail.ruleId}</span>
+        {viral.verification.checkedAt ? (
+          viral.verification.details.length > 0 ? (
+            <div className="space-y-2">
+              {viral.verification.details.map((detail, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between py-2.5 px-4 rounded-lg bg-zinc-800/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                        detail.passed
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}
+                    >
+                      {detail.passed ? '✓' : '✗'}
+                    </span>
+                    <span className="text-sm text-zinc-300">{detail.ruleId}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs text-zinc-500">{detail.note}</span>
+                    <span className="text-xs font-medium text-zinc-400">{detail.score}점</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-zinc-500">{detail.note}</span>
-                  <span className="text-xs font-medium text-zinc-400">{detail.score}점</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-zinc-500 text-sm">
+              검증 완료 — 가이드에 설정된 검증 규칙이 없어 세부 항목이 없습니다.
+              <br />
+              <span className="text-zinc-600">가이드 관리에서 검증 규칙(필수 키워드, 금지 키워드 등)을 추가하면 상세 결과를 확인할 수 있습니다.</span>
+            </div>
+          )
         ) : (
           <div className="text-center py-8 text-zinc-600 text-sm">
             아직 검증이 실행되지 않았습니다.
