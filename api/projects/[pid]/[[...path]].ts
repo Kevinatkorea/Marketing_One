@@ -601,37 +601,51 @@ async function handleReports(request: Request, pid: string, subPath: string[]): 
 }
 
 async function handleReportUpload(request: Request, pid: string): Promise<Response> {
-  const formData = await request.formData();
-  const file = formData.get('file') as File | null;
-  const mode = (formData.get('mode') as string) || 'append';
-  if (!file) return errorResponse('CSV/XLSX 파일이 필요합니다', 400);
+  const contentType = request.headers.get('content-type') || '';
+
+  let text: string;
+  let fileName: string;
+  let mode: string;
+
+  if (contentType.includes('application/json')) {
+    // JSON body: 클라이언트에서 CSV 텍스트를 직접 전송 (Vercel body size 제한 우회)
+    const body = (await parseBody(request)) as { csvText?: string; fileName?: string; mode?: string } | null;
+    if (!body?.csvText) return errorResponse('csvText가 필요합니다', 400);
+    text = body.csvText;
+    fileName = body.fileName || 'upload.csv';
+    mode = body.mode || 'append';
+  } else {
+    // FormData: XLSX 등 바이너리 파일 업로드
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    mode = (formData.get('mode') as string) || 'append';
+    if (!file) return errorResponse('CSV/XLSX 파일이 필요합니다', 400);
+    fileName = file.name;
+
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.csv') || name.endsWith('.tsv') || name.endsWith('.txt')) {
+      text = await file.text();
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await file.arrayBuffer() as ExcelJS.Buffer);
+      const ws = wb.worksheets[0];
+      if (!ws) return errorResponse('워크시트를 찾을 수 없습니다', 400);
+      const lines: string[] = [];
+      ws.eachRow((row) => {
+        const vals = [];
+        for (let c = 1; c <= (row.cellCount || 20); c++) {
+          vals.push(String(row.getCell(c).value ?? ''));
+        }
+        lines.push(vals.join('\t'));
+      });
+      text = lines.join('\n');
+    } else {
+      return errorResponse('지원하지 않는 파일 형식입니다 (.csv, .xlsx)', 400);
+    }
+  }
 
   const config = await adMappingConfigRepo.getOrCreate(pid);
   const uploadBatchId = `adru_upload_${Date.now()}`;
-
-  // Parse file
-  let text: string;
-  const name = file.name.toLowerCase();
-  if (name.endsWith('.csv') || name.endsWith('.tsv') || name.endsWith('.txt')) {
-    text = await file.text();
-  } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(await file.arrayBuffer() as ExcelJS.Buffer);
-    const ws = wb.worksheets[0];
-    if (!ws) return errorResponse('워크시트를 찾을 수 없습니다', 400);
-    // Convert to CSV text
-    const lines: string[] = [];
-    ws.eachRow((row) => {
-      const vals = [];
-      for (let c = 1; c <= (row.cellCount || 20); c++) {
-        vals.push(String(row.getCell(c).value ?? ''));
-      }
-      lines.push(vals.join('\t'));
-    });
-    text = lines.join('\n');
-  } else {
-    return errorResponse('지원하지 않는 파일 형식입니다 (.csv, .xlsx)', 400);
-  }
 
   let rows;
   try {
@@ -647,7 +661,7 @@ async function handleReportUpload(request: Request, pid: string): Promise<Respon
   // Upload record
   const uploadRecord = await adReportUploadRepo.create({
     projectId: pid,
-    fileName: file.name,
+    fileName,
     uploadedAt: new Date().toISOString(),
     rowCount: rows.length,
     processedCount: 0,

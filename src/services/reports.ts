@@ -34,14 +34,35 @@ export async function uploadMetaCsv(
   file: File,
   mode: 'append' | 'replace' = 'append',
 ): Promise<UploadResult> {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('mode', mode);
+  // 클라이언트에서 텍스트로 읽어 JSON body로 전송 (Vercel 4.5MB body 제한 우회)
+  let csvText: string;
+
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.csv') || name.endsWith('.tsv') || name.endsWith('.txt')) {
+    csvText = await file.text();
+  } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    // XLSX는 FormData로 전송 (일반적으로 작은 파일)
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('mode', mode);
+    const res = await fetch(`${BASE_URL}/projects/${projectId}/reports/upload`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(body.error || res.statusText);
+    }
+    return res.json();
+  } else {
+    throw new Error('지원하지 않는 파일 형식입니다 (.csv, .xlsx)');
+  }
 
   const res = await fetch(`${BASE_URL}/projects/${projectId}/reports/upload`, {
     method: 'POST',
-    headers: authHeaders(),
-    body: formData,
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ csvText, fileName: file.name, mode }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
