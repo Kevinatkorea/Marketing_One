@@ -201,6 +201,9 @@ async function handleVirals(request: Request, pid: string, subPath: string[]): P
   const segment2 = subPath[2]; // verify, comments, etc.
 
   // --- Action endpoints (no viral ID) ---
+  if (segment1 === 'fix-urls' && method(request) === 'POST') {
+    return handleFixUrls(pid);
+  }
   if (segment1 === 'bulk-text' && method(request) === 'POST') {
     return handleBulkText(request, pid);
   }
@@ -266,6 +269,33 @@ async function handleVirals(request: Request, pid: string, subPath: string[]): P
     return jsonResponse({ message: 'Deleted' });
   }
   return errorResponse('Method not allowed', 405);
+}
+
+// --- Fix URLs: extract clean URLs from mixed text ---
+
+async function handleFixUrls(pid: string): Promise<Response> {
+  const all = await viralRepo.findAll({ projectId: pid });
+  let fixed = 0;
+  for (const viral of all) {
+    const urlMatch = viral.url.match(/(https?:\/\/\S+)/);
+    if (urlMatch && urlMatch[1] !== viral.url) {
+      const cleanUrl = urlMatch[1];
+      const titleFromUrl = viral.url.slice(0, urlMatch.index).trim();
+      const updateData: Record<string, unknown> = { url: cleanUrl };
+      // 기존 title이 비어있거나 cafeName인 경우, URL 앞 텍스트를 title로 사용
+      if (!viral.title || viral.title === viral.cafeName) {
+        updateData.title = titleFromUrl || viral.title;
+      }
+      // cafeName이 비어있고 기존 title이 cafeName 같은 경우
+      if (!viral.cafeName && viral.title && titleFromUrl && viral.title !== titleFromUrl) {
+        updateData.cafeName = viral.title;
+        updateData.title = titleFromUrl;
+      }
+      await viralRepo.update(viral.id, updateData);
+      fixed++;
+    }
+  }
+  return jsonResponse({ message: `${fixed}건 URL 정리 완료`, total: all.length, fixed });
 }
 
 // --- Viral sub-handlers ---

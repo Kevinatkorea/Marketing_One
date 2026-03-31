@@ -35,6 +35,18 @@ function isUrl(text: string): boolean {
 }
 
 /**
+ * Extract clean URL from text that may contain a URL mixed with other text.
+ * e.g., "제목입니다   https://cafe.naver.com/abc/123" → "https://cafe.naver.com/abc/123"
+ */
+function extractUrl(text: string): { url: string; remaining: string } {
+  const match = text.match(/(https?:\/\/\S+)/);
+  if (!match) return { url: text.trim(), remaining: '' };
+  const url = match[1];
+  const remaining = text.slice(0, match.index).trim();
+  return { url, remaining };
+}
+
+/**
  * Parse pasted text into viral entries.
  *
  * Supports 3 formats:
@@ -76,50 +88,36 @@ export function parseViralText(text: string): ParsedViralEntry[] {
     for (const line of lines) {
       if (!isUrl(line)) continue;
       const parts = line.split('|').map((p) => p.trim());
-      if (parts.length >= 3) {
-        const url = parts.find((p) => isUrl(p)) || parts[parts.length - 1];
-        const nonUrlParts = parts.filter((p) => p !== url);
-        entries.push({
-          cafeName: nonUrlParts[0] || '',
-          title: nonUrlParts[1] || nonUrlParts[0] || '',
-          url,
-          platform: detectPlatform(url),
-        });
-      } else if (parts.length === 2) {
-        const url = parts.find((p) => isUrl(p)) || parts[1];
-        const other = parts.find((p) => !isUrl(p)) || '';
-        entries.push({
-          cafeName: '',
-          title: other,
-          url,
-          platform: detectPlatform(url),
-        });
-      }
+      // URL이 포함된 파트에서 URL만 추출
+      const urlPartIdx = parts.findIndex((p) => isUrl(p));
+      const { url, remaining: urlRemaining } = extractUrl(parts[urlPartIdx] || parts[parts.length - 1]);
+      const nonUrlParts = parts.filter((_, i) => i !== urlPartIdx);
+      if (urlRemaining) nonUrlParts.push(urlRemaining);
+
+      entries.push({
+        cafeName: nonUrlParts[0] || '',
+        title: nonUrlParts[1] || nonUrlParts[0] || '',
+        url,
+        platform: detectPlatform(url),
+      });
     }
   } else if (hasTabSeparator) {
     // Format 3: Tab separated
     for (const line of lines) {
       if (!isUrl(line)) continue;
       const parts = line.split('\t').map((p) => p.trim());
-      if (parts.length >= 3) {
-        const url = parts.find((p) => isUrl(p)) || parts[parts.length - 1];
-        const nonUrlParts = parts.filter((p) => p !== url);
-        entries.push({
-          cafeName: nonUrlParts[0] || '',
-          title: nonUrlParts[1] || nonUrlParts[0] || '',
-          url,
-          platform: detectPlatform(url),
-        });
-      } else if (parts.length === 2) {
-        const url = parts.find((p) => isUrl(p)) || parts[1];
-        const other = parts.find((p) => !isUrl(p)) || '';
-        entries.push({
-          cafeName: '',
-          title: other,
-          url,
-          platform: detectPlatform(url),
-        });
-      }
+      // URL이 포함된 파트에서 URL만 추출
+      const urlPartIdx = parts.findIndex((p) => isUrl(p));
+      const { url, remaining: urlRemaining } = extractUrl(parts[urlPartIdx] || parts[parts.length - 1]);
+      const nonUrlParts = parts.filter((_, i) => i !== urlPartIdx);
+      if (urlRemaining) nonUrlParts.push(urlRemaining);
+
+      entries.push({
+        cafeName: nonUrlParts[0] || '',
+        title: nonUrlParts[1] || nonUrlParts[0] || '',
+        url,
+        platform: detectPlatform(url),
+      });
     }
   } else {
     // Format 1: 3-line repeating (or URL-only lines)
