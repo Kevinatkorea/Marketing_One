@@ -7,3 +7,4 @@ export { CommentRepository } from './CommentRepository.js';
 export { AdReportRepository } from './AdReportRepository.js';
 export { AdReportUploadRepository } from './AdReportUploadRepository.js';
 export { AdMappingConfigRepository } from './AdMappingConfigRepository.js';
+export { DailyManualInputRepository } from './DailyManualInputRepository.js';

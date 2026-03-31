@@ -10,6 +10,7 @@ import { CommentRepository } from './json/CommentRepository.js';
 import { AdReportRepository } from './json/AdReportRepository.js';
 import { AdReportUploadRepository } from './json/AdReportUploadRepository.js';
 import { AdMappingConfigRepository } from './json/AdMappingConfigRepository.js';
+import { DailyManualInputRepository } from './json/DailyManualInputRepository.js';
 
 // Re-export interfaces
 export type { IProjectRepository } from './interfaces/IProjectRepository.js';
@@ -22,6 +23,7 @@ export type { ICommentRepository } from './interfaces/ICommentRepository.js';
 export {
   ProjectRepository, ProductRepository, GuideRepository, ViralRepository, CommentRepository,
   AdReportRepository, AdReportUploadRepository, AdMappingConfigRepository,
+  DailyManualInputRepository,
 };
 
 // Singleton instances -- reused across serverless invocations within the same
@@ -35,3 +37,4 @@ export const commentRepo = new CommentRepository();
 export const adReportRepo = new AdReportRepository();
 export const adReportUploadRepo = new AdReportUploadRepository();
 export const adMappingConfigRepo = new AdMappingConfigRepository();
+export const dailyManualInputRepo = new DailyManualInputRepository();

@@ -52,6 +52,30 @@ export function getDefaultMappingConfig(): Omit<AdMappingConfig, 'id' | 'project
       { pattern: '체험권', label: '체험권(기타)' },
     ],
     categoryDefault: 'META',
+    // 일일보고 설정
+    mediaSources: ['fb&insta', '당근', '구글', '토스', '오가닉'],
+    dailyReportBranchOrder: ['잠실점', '서초본점', '수원점', '울산점', '광주점', '노원점', '대구점', '양산점', '천안점', '전주점', '제주점', '남양주점'],
+    branchMediaSources: {
+      '잠실점': ['fb&insta', '구글', '오가닉'],
+      '서초본점': ['fb&insta', '당근', '오가닉'],
+      '수원점': ['fb&insta', '당근', '오가닉'],
+      '울산점': ['fb&insta', '당근', '토스', '오가닉'],
+      '광주점': ['fb&insta', '당근', '오가닉'],
+      '노원점': ['fb&insta', '당근', '오가닉'],
+      '대구점': ['fb&insta', '당근', '오가닉'],
+      '양산점': ['fb&insta', '당근', '오가닉'],
+      '천안점': ['fb&insta', '당근', '오가닉'],
+      '전주점': ['fb&insta', '당근', '오가닉'],
+      '제주점': ['fb&insta', '당근', '오가닉'],
+      '남양주점': ['fb&insta', '당근', '오가닉'],
+    },
+    mediaDisplayNames: {
+      'fb&insta': 'fb&insta',
+      '당근': '당근APP',
+      '구글': '구글',
+      '토스': '토스',
+      '오가닉': '오가닉',
+    },
   };
 }
 
@@ -291,6 +315,8 @@ export function transformRow(
       costExVat: cost,
       costInVat: cost,
       registrations,
+      formRegistrations: raw.formRegistrations,
+      leadRegistrations: raw.leadRegistrations,
       rawCampaignName: raw.campaignName,
       rawAdSetName: raw.adSetName,
       rawAdName: raw.adName,

@@ -8,11 +8,14 @@ import {
   uploadMetaCsv, fetchReportUploads, deleteReportUpload,
   fetchReportSummary, fetchBranchReports,
   fetchMappingConfig, updateMappingConfig, fetchAvailableMonths,
+  fetchDailyReport, saveDailyReport, fetchMetaSummary,
   type ReportSummaryResponse, type UploadResult,
+  type DailyReportResponse, type MetaSummaryResponse,
 } from '../services/reports';
 import type { AdReportUpload, AdMappingConfig, BranchSummary } from '../types';
 
 const mainTabs = [
+  { key: 'daily', label: '일일보고' },
   { key: 'upload', label: 'CSV 업로드' },
   { key: 'summary', label: '종합보고서' },
   { key: 'branches', label: '지점별보고서' },
@@ -45,7 +48,7 @@ function won(n: number | null | undefined): string {
 
 export default function ReportManagement() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState<TabKey>('upload');
+  const [activeTab, setActiveTab] = useState<TabKey>('daily');
 
   if (!projectId) return null;
 
@@ -69,6 +72,7 @@ export default function ReportManagement() {
         </nav>
       </div>
 
+      {activeTab === 'daily' && <DailyReportTab projectId={projectId} />}
       {activeTab === 'upload' && <UploadTab projectId={projectId} />}
       {activeTab === 'summary' && <SummaryTab projectId={projectId} />}
       {activeTab === 'branches' && <BranchesTab projectId={projectId} />}
@@ -620,6 +624,256 @@ function ConfigTab({ projectId }: { projectId: string }) {
         </button>
         {msg && <span className={`text-sm ${msg.startsWith('오류') ? 'text-red-400' : 'text-emerald-400'}`}>{msg}</span>}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Tab: Daily Report (일일보고)
+// ============================================================
+
+function todayKST(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().split('T')[0];
+}
+
+interface ManualRow {
+  branch: string;
+  sources: Record<string, { leads: number; homepage: number; adSpend: number }>;
+  memo: string;
+}
+
+function DailyReportTab({ projectId }: { projectId: string }) {
+  const [date, setDate] = useState(todayKST());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [report, setReport] = useState<DailyReportResponse | null>(null);
+  const [metaSummary, setMetaSummary] = useState<MetaSummaryResponse | null>(null);
+  const [rows, setRows] = useState<ManualRow[]>([]);
+  const [copied, setCopied] = useState(false);
+
+  // 날짜 변경 시 데이터 로드
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      fetchDailyReport(projectId, date).catch(() => null),
+      fetchMetaSummary(projectId, date).catch(() => null),
+      fetchMappingConfig(projectId).catch(() => null),
+    ]).then(([rep, meta, config]) => {
+      setReport(rep);
+      setMetaSummary(meta);
+
+      // 입력 폼 초기화
+      if (rep?.branches) {
+        setRows(rep.branches.map((b) => ({
+          branch: b.branch,
+          sources: Object.fromEntries(
+            b.sourceOrder
+              .filter((s) => s !== 'fb&insta')
+              .map((s) => [s, {
+                leads: b.sources[s]?.leads || 0,
+                homepage: b.sources[s]?.homepage || 0,
+                adSpend: b.sources[s]?.adSpend || 0,
+              }])
+          ),
+          memo: b.memo || '',
+        })));
+      } else if (config) {
+        const order = config.dailyReportBranchOrder || config.branches?.map((b: any) => b.fullName) || [];
+        setRows(order.map((branch: string) => {
+          const mediaSources = config.branchMediaSources?.[branch] || config.mediaSources || [];
+          return {
+            branch,
+            sources: Object.fromEntries(
+              mediaSources.filter((s: string) => s !== 'fb&insta').map((s: string) => [s, { leads: 0, homepage: 0, adSpend: 0 }])
+            ),
+            memo: '',
+          };
+        }));
+      }
+      setLoading(false);
+    });
+  }, [projectId, date]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await saveDailyReport(projectId, { date, branches: rows });
+      setReport(res);
+    } catch (e) {
+      alert((e as Error).message);
+    }
+    setSaving(false);
+  };
+
+  const handleCopy = () => {
+    if (!report?.message) return;
+    navigator.clipboard.writeText(report.message);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const updateSource = (branchIdx: number, source: string, field: 'leads' | 'homepage' | 'adSpend', value: number) => {
+    setRows((prev) => {
+      const next = [...prev];
+      next[branchIdx] = {
+        ...next[branchIdx],
+        sources: {
+          ...next[branchIdx].sources,
+          [source]: { ...next[branchIdx].sources[source], [field]: value },
+        },
+      };
+      return next;
+    });
+  };
+
+  if (loading) return <div className="text-zinc-400 py-12 text-center animate-pulse">로딩 중...</div>;
+
+  // 모든 타매체 소스 목록 (fb&insta 제외)
+  const allSources = [...new Set(rows.flatMap((r) => Object.keys(r.sources)))];
+
+  return (
+    <div className="space-y-6">
+      {/* Date Selector */}
+      <div className="flex items-center gap-4">
+        <label className="text-sm text-zinc-400">날짜:</label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-lg px-3 py-1.5 text-sm"
+        />
+      </div>
+
+      {/* Input Table */}
+      <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-zinc-800/50">
+            <tr>
+              <th className="text-left px-3 py-2 text-zinc-400 font-medium sticky left-0 bg-zinc-800/50">지점</th>
+              <th className="text-right px-3 py-2 text-zinc-400 font-medium">fb&insta<br/><span className="text-[10px] text-zinc-500">(자동)</span></th>
+              {allSources.map((s) => (
+                <th key={s} className="text-right px-3 py-2 text-zinc-400 font-medium">{s}</th>
+              ))}
+              <th className="text-right px-3 py-2 text-zinc-400 font-medium">합계</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-800">
+            {rows.map((row, bi) => {
+              const meta = metaSummary?.branches?.[row.branch];
+              const metaTotal = (meta?.leads || 0) + (meta?.homepage || 0);
+              const manualTotal = Object.values(row.sources).reduce((s, v) => s + v.leads + v.homepage, 0);
+              const total = metaTotal + manualTotal;
+
+              return (
+                <tr key={row.branch} className="hover:bg-zinc-800/30">
+                  <td className="px-3 py-2 text-zinc-300 font-medium sticky left-0 bg-zinc-900">{row.branch}</td>
+                  <td className="px-3 py-2 text-right">
+                    <span className="text-blue-400 font-medium">{metaTotal}</span>
+                    {meta && (meta.leads > 0 || meta.homepage > 0) && (
+                      <span className="text-[10px] text-zinc-500 ml-1">
+                        {meta.leads > 0 && `잠재${meta.leads}`}
+                        {meta.leads > 0 && meta.homepage > 0 && '/'}
+                        {meta.homepage > 0 && `홈${meta.homepage}`}
+                      </span>
+                    )}
+                  </td>
+                  {allSources.map((source) => {
+                    const sv = row.sources[source];
+                    if (!sv) return <td key={source} className="px-3 py-2 text-center text-zinc-600">-</td>;
+                    return (
+                      <td key={source} className="px-3 py-2">
+                        <div className="flex items-center justify-end gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={sv.leads + sv.homepage || ''}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value) || 0;
+                              updateSource(bi, source, 'leads', v);
+                              updateSource(bi, source, 'homepage', 0);
+                            }}
+                            placeholder="0"
+                            className="w-14 bg-zinc-800 border border-zinc-700 text-zinc-200 rounded px-2 py-1 text-right text-sm"
+                          />
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-right font-semibold text-zinc-100">{total}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Ad Spend Row (별도) */}
+      <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+        <div className="px-3 py-2 bg-zinc-800/50 text-sm text-zinc-400 font-medium">광고비 (당일)</div>
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-zinc-800">
+            {rows.map((row, bi) => {
+              const metaSpend = metaSummary?.branches?.[row.branch]?.adSpend || 0;
+              return (
+                <tr key={row.branch} className="hover:bg-zinc-800/30">
+                  <td className="px-3 py-2 text-zinc-300 font-medium w-24">{row.branch}</td>
+                  <td className="px-3 py-2 text-right text-sm">
+                    <span className="text-zinc-500 text-xs mr-1">fb&insta</span>
+                    <span className="text-blue-400">{metaSpend > 0 ? `₩${Math.round(metaSpend).toLocaleString()}` : '-'}</span>
+                  </td>
+                  {Object.entries(row.sources).map(([source, sv]) => (
+                    <td key={source} className="px-3 py-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-zinc-500 text-xs">{source}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={sv.adSpend || ''}
+                          onChange={(e) => updateSource(bi, source, 'adSpend', parseInt(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-24 bg-zinc-800 border border-zinc-700 text-zinc-200 rounded px-2 py-1 text-right text-sm"
+                        />
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          {saving ? '생성 중...' : '보고서 생성'}
+        </button>
+        {report?.message && (
+          <button
+            onClick={handleCopy}
+            className="px-6 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg text-sm font-medium transition-colors"
+          >
+            {copied ? '복사됨!' : '클립보드 복사'}
+          </button>
+        )}
+      </div>
+
+      {/* Generated Message */}
+      {report?.message && (
+        <div className="rounded-lg border border-zinc-700 bg-zinc-800/30 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-zinc-300">생성된 일일보고</h3>
+            <span className="text-xs text-zinc-500">{date}</span>
+          </div>
+          <pre className="text-sm text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed">{report.message}</pre>
+        </div>
+      )}
     </div>
   );
 }

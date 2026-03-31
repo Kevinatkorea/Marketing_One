@@ -8,7 +8,7 @@ import type {
   WeekSummary,
   PaginatedResult,
 } from '../types';
-import { get, put, del } from './api';
+import { get, post, put, del } from './api';
 
 const BASE_URL = '/api';
 
@@ -145,4 +145,62 @@ export function updateMappingConfig(
 
 export function fetchAvailableMonths(projectId: string): Promise<string[]> {
   return get<string[]>(`/projects/${projectId}/reports/months`);
+}
+
+// --- Daily Reports (일일보고) ---
+
+export interface DailySourceData {
+  leads: number;
+  homepage: number;
+  adSpend: number;
+  monthlyAdSpend: number;
+}
+
+export interface BranchReportData {
+  branch: string;
+  sources: Record<string, DailySourceData>;
+  sourceOrder: string[];
+  dailyTotal: number;
+  monthlyTotal: number;
+  dailyCpa: number | null;
+  monthlyCpa: number | null;
+  memo: string;
+}
+
+export interface DailyReportResponse {
+  date: string;
+  branches: BranchReportData[];
+  message: string;
+}
+
+export function fetchDailyReport(projectId: string, date: string): Promise<DailyReportResponse> {
+  return get<DailyReportResponse>(`/projects/${projectId}/daily-reports?date=${date}`);
+}
+
+export function saveDailyReport(
+  projectId: string,
+  data: {
+    date: string;
+    branches: Array<{
+      branch: string;
+      sources: Record<string, { leads: number; homepage: number; adSpend: number }>;
+      memo?: string;
+    }>;
+  },
+): Promise<DailyReportResponse> {
+  return post<DailyReportResponse>(`/projects/${projectId}/daily-reports`, data);
+}
+
+export function fetchDailyReportMessage(projectId: string, date: string): Promise<{ message: string }> {
+  return get<{ message: string }>(`/projects/${projectId}/daily-reports/message?date=${date}`);
+}
+
+export interface MetaSummaryResponse {
+  date: string;
+  branches: Record<string, { leads: number; homepage: number; adSpend: number }>;
+  branchOrder: string[];
+}
+
+export function fetchMetaSummary(projectId: string, date: string): Promise<MetaSummaryResponse> {
+  return get<MetaSummaryResponse>(`/projects/${projectId}/daily-reports/meta-summary?date=${date}`);
 }

@@ -14,6 +14,7 @@ import {
   adReportRepo,
   adReportUploadRepo,
   adMappingConfigRepo,
+  dailyManualInputRepo,
 } from '../../../lib/repositories/index.js';
 import {
   updateProjectSchema,
@@ -47,6 +48,10 @@ import {
   aggregateByBranch,
   aggregateByWeek,
 } from '../../../lib/services/adReportMapper.js';
+import {
+  buildDailyReportData,
+  generateReportMessage,
+} from '../../../lib/services/dailyReportGenerator.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -848,6 +853,116 @@ async function handleRawData(request: Request, pid: string): Promise<Response> {
 }
 
 // ---------------------------------------------------------------------------
+// Daily Reports (일일보고)  /api/projects/:pid/daily-reports/...
+// ---------------------------------------------------------------------------
+
+async function handleDailyReports(request: Request, pid: string, subPath: string[]): Promise<Response> {
+  const segment1 = subPath[1]; // 'message', 'meta-summary', or undefined
+  const params = getQueryParams(request);
+  const date = params.get('date') || new Date().toISOString().split('T')[0];
+
+  if (!segment1 && method(request) === 'GET') {
+    // 일일보고 데이터 (Meta 자동 + 수동 병합)
+    return handleGetDailyReport(pid, date);
+  }
+  if (!segment1 && method(request) === 'POST') {
+    // 수동 데이터 저장 + 보고서 반환
+    return handleSaveDailyReport(request, pid);
+  }
+  if (segment1 === 'message' && method(request) === 'GET') {
+    // 텍스트 메시지만 반환
+    return handleGetDailyMessage(pid, date);
+  }
+  if (segment1 === 'meta-summary' && method(request) === 'GET') {
+    // Meta CSV 자동 집계만 (폼 프리필용)
+    return handleGetMetaSummary(pid, date);
+  }
+
+  return errorResponse('Not found', 404);
+}
+
+async function handleGetDailyReport(pid: string, date: string): Promise<Response> {
+  const config = await adMappingConfigRepo.getOrCreate(pid);
+  const allMeta = await adReportRepo.findAll({ projectId: pid });
+  const dailyManual = await dailyManualInputRepo.findByDate(pid, date);
+  const yearMonth = date.slice(0, 7);
+  const monthlyManual = await dailyManualInputRepo.findByMonth(pid, yearMonth);
+
+  const reportData = buildDailyReportData(date, config, allMeta, dailyManual, monthlyManual);
+  const message = generateReportMessage(reportData, config);
+
+  return jsonResponse({ ...reportData, message });
+}
+
+async function handleSaveDailyReport(request: Request, pid: string): Promise<Response> {
+  const body = (await parseBody(request)) as {
+    date?: string;
+    branches?: Array<{
+      branch: string;
+      sources: Record<string, { leads: number; homepage: number; adSpend: number }>;
+      memo?: string;
+    }>;
+  } | null;
+
+  if (!body?.date || !body?.branches) {
+    return errorResponse('date와 branches가 필요합니다', 400);
+  }
+
+  // 수동 입력 저장
+  await dailyManualInputRepo.upsertAll(
+    pid,
+    body.date,
+    body.branches.map((b) => ({
+      branch: b.branch,
+      sources: b.sources,
+      memo: b.memo || '',
+    })),
+  );
+
+  // 저장 후 보고서 데이터 재생성
+  const config = await adMappingConfigRepo.getOrCreate(pid);
+  const allMeta = await adReportRepo.findAll({ projectId: pid });
+  const dailyManual = await dailyManualInputRepo.findByDate(pid, body.date);
+  const yearMonth = body.date.slice(0, 7);
+  const monthlyManual = await dailyManualInputRepo.findByMonth(pid, yearMonth);
+
+  const reportData = buildDailyReportData(body.date, config, allMeta, dailyManual, monthlyManual);
+  const message = generateReportMessage(reportData, config);
+
+  return jsonResponse({ ...reportData, message }, 201);
+}
+
+async function handleGetDailyMessage(pid: string, date: string): Promise<Response> {
+  const config = await adMappingConfigRepo.getOrCreate(pid);
+  const allMeta = await adReportRepo.findAll({ projectId: pid });
+  const dailyManual = await dailyManualInputRepo.findByDate(pid, date);
+  const yearMonth = date.slice(0, 7);
+  const monthlyManual = await dailyManualInputRepo.findByMonth(pid, yearMonth);
+
+  const reportData = buildDailyReportData(date, config, allMeta, dailyManual, monthlyManual);
+  const message = generateReportMessage(reportData, config);
+
+  return jsonResponse({ message });
+}
+
+async function handleGetMetaSummary(pid: string, date: string): Promise<Response> {
+  const allMeta = await adReportRepo.findAll({ projectId: pid });
+  const config = await adMappingConfigRepo.getOrCreate(pid);
+
+  // 해당 날짜의 지점별 Meta 자동 데이터
+  const metaByBranch: Record<string, { leads: number; homepage: number; adSpend: number }> = {};
+  for (const e of allMeta) {
+    if (e.date !== date) continue;
+    if (!metaByBranch[e.branch]) metaByBranch[e.branch] = { leads: 0, homepage: 0, adSpend: 0 };
+    metaByBranch[e.branch].leads += e.leadRegistrations || 0;
+    metaByBranch[e.branch].homepage += e.formRegistrations || 0;
+    metaByBranch[e.branch].adSpend += e.cost;
+  }
+
+  return jsonResponse({ date, branches: metaByBranch, branchOrder: config.dailyReportBranchOrder });
+}
+
+// ---------------------------------------------------------------------------
 // Main Router
 // ---------------------------------------------------------------------------
 
@@ -873,6 +988,7 @@ async function route(request: Request): Promise<Response> {
     if (resource === 'virals') return handleVirals(request, pid, subPath);
     if (resource === 'dashboard') return handleDashboard(request, pid);
     if (resource === 'reports') return handleReports(request, pid, subPath);
+    if (resource === 'daily-reports') return handleDailyReports(request, pid, subPath);
 
     return errorResponse('Not found', 404);
   } catch (err) {

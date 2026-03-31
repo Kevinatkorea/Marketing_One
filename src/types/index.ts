@@ -203,7 +203,9 @@ export interface AdReportEntry {
   cost: number;            // 매체비용
   costExVat: number;
   costInVat: number;
-  registrations: number;   // 신청완료 (등록 + 잠재고객)
+  registrations: number;      // 신청완료 합산 (등록 + 잠재고객, 기존 호환)
+  formRegistrations: number;  // 등록 (= 홈페이지 전환)
+  leadRegistrations: number;  // 잠재 고객 (= Meta 리드)
   rawCampaignName: string;
   rawAdSetName: string;
   rawAdName: string;
@@ -247,6 +249,30 @@ export interface AdMappingConfig {
   targetKeywords: AdMappingTargetKeyword[];
   creativePatterns: AdMappingCreativePattern[];
   categoryDefault: string;
+  // 일일보고 설정
+  mediaSources: string[];                         // ["fb&insta","당근","구글","토스","오가닉"]
+  dailyReportBranchOrder: string[];               // ["잠실점","서초본점",...]
+  branchMediaSources: Record<string, string[]>;   // 지점별 매체 목록
+  mediaDisplayNames: Record<string, string>;      // {"당근":"당근APP"}
+  updatedAt: string;
+}
+
+// --- Daily Manual Input (수동 입력) ---
+
+export interface DailyManualSourceData {
+  leads: number;      // 잠재고객
+  homepage: number;   // 홈페이지 전환
+  adSpend: number;    // 광고비
+}
+
+export interface DailyManualInput {
+  id: string;
+  projectId: string;
+  date: string;       // "2026-04-01"
+  branch: string;     // "서초본점"
+  sources: Record<string, DailyManualSourceData>;
+  memo: string;
+  createdAt: string;
   updatedAt: string;
 }
 
