@@ -41,20 +41,15 @@ export async function uploadMetaCsv(
   if (name.endsWith('.csv') || name.endsWith('.tsv') || name.endsWith('.txt')) {
     csvText = await file.text();
   } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-    // XLSX는 FormData로 전송 (일반적으로 작은 파일)
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('mode', mode);
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/reports/upload`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: formData,
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(body.error || res.statusText);
-    }
-    return res.json();
+    // 브라우저에서 XLSX 파싱 → "변환용" 시트를 CSV 텍스트로 변환 (Vercel 4.5MB 제한 우회)
+    const XLSX = await import('xlsx');
+    const data = new Uint8Array(await file.arrayBuffer());
+    const wb = XLSX.read(data, { type: 'array' });
+    // "변환용" 시트 우선, 없으면 첫 번째 시트
+    const sheetName = wb.SheetNames.includes('변환용') ? '변환용' : wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    if (!ws) throw new Error('워크시트를 찾을 수 없습니다');
+    csvText = XLSX.utils.sheet_to_csv(ws, { FS: '\t' });
   } else {
     throw new Error('지원하지 않는 파일 형식입니다 (.csv, .xlsx)');
   }
