@@ -66,10 +66,10 @@ export default function Sidebar() {
         <div className="h-16 flex items-center px-5 border-b border-zinc-800 shrink-0">
           <NavLink to="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
-              P1
+              MO
             </div>
             <span className="text-zinc-100 font-semibold text-lg tracking-tight group-hover:text-blue-400 transition-colors">
-              PerformanceOne
+              MO-System
             </span>
           </NavLink>
         </div>
@@ -118,7 +118,7 @@ export default function Sidebar() {
         {/* Footer */}
         <div className="p-4 border-t border-zinc-800 shrink-0">
           <div className="text-xs text-zinc-600">
-            PerformanceOne v1.0
+            MO-System v1.0
           </div>
         </div>
       </aside>
