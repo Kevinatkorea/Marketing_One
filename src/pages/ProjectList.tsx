@@ -76,10 +76,10 @@ export default function ProjectList() {
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold">
-              P1
+              MO
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">PerformanceOne</h1>
+              <h1 className="text-xl font-bold tracking-tight">MO-System</h1>
               <p className="text-sm text-zinc-500">퍼포먼스 마케팅 통합 관리시스템</p>
             </div>
           </div>
