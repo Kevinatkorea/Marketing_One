@@ -47,13 +47,20 @@ function parseNaverCafeUrl(url: string): CafeUrlParts | null {
   return null;
 }
 
-/** cafeName → 숫자 clubId (데스크탑 카페 페이지 HTML에서 추출) */
+/**
+ * cafeName(URL name) → 숫자 clubId
+ *
+ * 주의 — 네이버 카페 URL path segment가 숫자인 경우에도 그것이 clubId라는 보장은 없다.
+ * 예: `cafe.naver.com/15668981/4638533`에서 `15668981`은 "임산부모여라 알럽맘" 카페의
+ * URL name(문자열로 숫자인 경우)이며, 실제 clubId는 11291786이다. 이 오해로 과거에
+ * 전혀 다른 카페("만들기 나라")의 글을 조회해 본문이 비어버리는 버그가 있었다.
+ *
+ * 따라서 URL name이 숫자든 문자든 항상 카페 홈 HTML에서 `clubid=` 값을 추출한다.
+ * 캐시로 반복 조회 비용은 최소화한다.
+ */
 const clubIdCache = new Map<string, number>();
 
 async function resolveClubId(cafeName: string): Promise<number> {
-  // 이미 숫자면 바로 반환
-  if (/^\d+$/.test(cafeName)) return Number(cafeName);
-
   const cached = clubIdCache.get(cafeName);
   if (cached) return cached;
 
