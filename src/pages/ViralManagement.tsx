@@ -241,10 +241,10 @@ export default function ViralManagement() {
         />
       </div>
 
-      {/* Charts — 파이 축소, 부적합 원인 확대 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Donut Chart — 1칸 */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5">
+      {/* Charts — 도넛 절반 축소, 바 라벨 영역 3배 확대 */}
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
+        {/* Donut Chart — 1/6칸 (기존 1/3 대비 절반) */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5 lg:col-span-1">
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">검증결과 분포</h3>
           {pieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={180}>
@@ -253,8 +253,8 @@ export default function ViralManagement() {
                   data={pieData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={35}
-                  outerRadius={60}
+                  innerRadius={30}
+                  outerRadius={50}
                   paddingAngle={3}
                   dataKey="value"
                   stroke="none"
@@ -288,8 +288,8 @@ export default function ViralManagement() {
           )}
         </div>
 
-        {/* Bar Chart — 2칸 */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5 lg:col-span-2">
+        {/* Bar Chart — 5/6칸 (도넛이 1/6로 줄어든 공간 흡수) */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-5 lg:col-span-5">
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">부적합 원인 분석</h3>
           {barData.length > 0 ? (
             <ResponsiveContainer width="100%" height={180}>
@@ -302,7 +302,7 @@ export default function ViralManagement() {
                   tick={{ fill: '#a1a1aa', fontSize: 12 }}
                   axisLine={false}
                   tickLine={false}
-                  width={120}
+                  width={360}
                 />
                 <Tooltip
                   contentStyle={{
@@ -313,7 +313,7 @@ export default function ViralManagement() {
                     fontSize: '13px',
                   }}
                 />
-                <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={10} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
