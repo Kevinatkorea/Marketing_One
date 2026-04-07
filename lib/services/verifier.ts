@@ -2,9 +2,9 @@
  * 가이드 적합성 검증 엔진 — 2단계: 사전 체크리스트 + AI 분석
  */
 import { generateText } from 'ai';
-import { anthropic } from '@ai-sdk/anthropic';
 import type { Guide, VerificationDetail } from '../../src/types/index.js';
 import { crawlUrl, type CrawlResult } from './crawler.js';
+import { analysisModel, zaiProviderOptions } from './ai.js';
 
 export interface VerifyResult {
   result: 'ok' | 'warning' | 'fail';
@@ -31,15 +31,34 @@ export function preCheck(crawl: CrawlResult, guide: Guide): { details: Verificat
     if (rule.ruleId === 'required_keywords' || rule.name.includes('키워드 포함')) {
       const keywords = (config.keywords as string[]) || [];
       const minMatch = (config.minMatch as number) || 1;
-      const textLower = crawl.text.toLowerCase();
-      const matched = keywords.filter((kw) => textLower.includes(kw.toLowerCase()));
-      const passed = matched.length >= minMatch;
-      const ratio = keywords.length > 0 ? matched.length / keywords.length : 0;
+
+      const bodyLower = crawl.text.toLowerCase();
+      const commentsLower = (crawl.comments || [])
+        .map((c) => c.content)
+        .join('\n')
+        .toLowerCase();
+
+      // 본문/댓글 매칭 분리 추적 — 중복 카운트 방지 (본문 우선)
+      const matchedInBody: string[] = [];
+      const matchedInComments: string[] = [];
+      for (const kw of keywords) {
+        const kwLower = kw.toLowerCase();
+        if (bodyLower.includes(kwLower)) {
+          matchedInBody.push(kw);
+        } else if (commentsLower.includes(kwLower)) {
+          matchedInComments.push(kw);
+        }
+      }
+
+      const totalMatched = matchedInBody.length + matchedInComments.length;
+      const passed = totalMatched >= minMatch;
+      const ratio = keywords.length > 0 ? totalMatched / keywords.length : 0;
+
       details.push({
         ruleId: rule.ruleId,
         passed,
         score: Math.round(ratio * rule.weight),
-        note: `${matched.length}/${keywords.length} 키워드 포함 (최소 ${minMatch})`,
+        note: `${totalMatched}/${keywords.length} 키워드 포함 (본문 ${matchedInBody.length} · 댓글 ${matchedInComments.length}, 최소 ${minMatch})`,
       });
       if (!passed && rule.isAutoFail) autoFail = true;
     } else if (rule.ruleId === 'forbidden_keywords' || rule.name.includes('금지')) {
@@ -109,7 +128,8 @@ async function aiAnalysis(
 
   try {
     const { text: aiResult } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: analysisModel,
+      providerOptions: zaiProviderOptions,
       prompt: `바이럴 마케팅 콘텐츠를 검증해주세요.
 
 ## 콘텐츠

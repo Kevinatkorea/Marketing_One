@@ -1,8 +1,8 @@
 /**
- * 댓글 감성분석 서비스 — AI Gateway (Claude) 기반
+ * 댓글 감성분석 서비스 — Z.ai GLM 기반
  */
 import { generateText } from 'ai';
-import { anthropic } from '@ai-sdk/anthropic';
+import { analysisModel, zaiProviderOptions } from './ai.js';
 
 export interface SentimentResult {
   sentiment: 'positive' | 'neutral' | 'negative';
@@ -24,7 +24,8 @@ export async function analyzeComments(
 
   try {
     const { text: aiResult } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: analysisModel,
+      providerOptions: zaiProviderOptions,
       prompt: `바이럴 마케팅 게시물의 댓글을 분석하세요.
 
 ## 댓글 목록
