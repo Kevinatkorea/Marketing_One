@@ -40,7 +40,18 @@ const router = createBrowserRouter([
         path: 'reports',
         element: <ReportManagement />,
       },
+      // 프로젝트 내부에서 잘못된 하위 경로 → 메인으로
+      {
+        path: '*',
+        element: <Navigate to="/" replace />,
+      },
     ],
+  },
+  // 최상위에서 매칭 실패한 모든 경로 → 메인으로
+  // 예: /projects/ (id 누락), /typo, 존재하지 않는 북마크 등
+  {
+    path: '*',
+    element: <Navigate to="/" replace />,
   },
 ]);
 
