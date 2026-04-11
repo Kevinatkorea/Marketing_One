@@ -27,17 +27,15 @@ const GuideOutputSchema = z.object({
   toneAndManner: z.string().describe('톤앤매너 가이드'),
   requiredKeywords: z
     .array(z.string())
-    .min(3)
-    .describe('본문에 반드시 포함되어야 할 키워드 (자사 제품명·카테고리·핵심키워드 포함, 최소 3개)'),
+    .describe('본문에 반드시 포함되어야 할 키워드. 자사 제품명·카테고리·핵심키워드를 포함해 최소 3개 이상.'),
   forbiddenKeywords: z
     .array(z.string())
     .describe('사용 금지 키워드 (경쟁사 브랜드명, 과장 광고 표현 등)'),
-  minLength: z.number().int().min(300).describe('본문 최소 글자수 (300자 이상)'),
+  minLength: z.number().int().describe('본문 최소 글자수. 300 이상이어야 함.'),
   minRequiredKeywordMatch: z
     .number()
     .int()
-    .min(1)
-    .describe('requiredKeywords 중 몇 개 이상 포함되어야 하는지'),
+    .describe('requiredKeywords 중 몇 개 이상 포함되어야 하는지. 1 이상.'),
   blogStructure: z
     .array(z.string())
     .describe('블로그 글 구성 단계별 가이드 (예: ["1. 인트로 — 문제 제기", "2. 본문 — 해결책 소개", ...])'),
