@@ -15,9 +15,15 @@
  */
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 
+// 진단 로그: Vercel Functions 로그에서 env 주입 상태를 확인하기 위함
+const zaiKey = process.env.ZAI_API_KEY;
+console.log(
+  `[ai.ts] ZAI_API_KEY present=${!!zaiKey} length=${zaiKey?.length ?? 0}`
+);
+
 const zai = createOpenAICompatible({
   name: 'zai',
-  apiKey: process.env.ZAI_API_KEY,
+  apiKey: zaiKey,
   baseURL: 'https://api.z.ai/api/paas/v4',
 });
 
