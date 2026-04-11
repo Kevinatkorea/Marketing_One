@@ -8,7 +8,7 @@
  * 1) 검증 룰 (VerificationRule[]) — verifier.ts 호환 형식 (required_keywords, forbidden_keywords, content_structure, tone_check, naver_policy)
  * 2) customGuidelines (markdown) — 사람이 읽는 내러티브 (타깃·톤·구성·Do/Don't·차별화 등)
  */
-import { generateObject } from 'ai';
+import { generateText, Output } from 'ai';
 import { z } from 'zod';
 import type {
   Guide,
@@ -16,7 +16,7 @@ import type {
   ProjectInfo,
   VerificationRule,
 } from '../../src/types/index.js';
-import { analysisModel, zaiProviderOptions } from './ai.js';
+import { guideModel } from './ai.js';
 
 // --- LLM 출력 스키마 ----------------------------------------------------
 
@@ -202,19 +202,18 @@ export async function generateGuideFromProjectInfo(
 ): Promise<GeneratedGuidePayload> {
   const prompt = buildPrompt(projectInfo, product, additionalNotes);
 
-  const { object } = await generateObject({
-    model: analysisModel,
-    schema: GuideOutputSchema,
+  const { output } = await generateText({
+    model: guideModel,
+    output: Output.object({ schema: GuideOutputSchema }),
     system:
       '당신은 한국어 블로그 바이럴 마케팅 가이드 작성 전문가입니다. 네이버 블로그/카페 바이럴 콘텐츠 작성자들이 참고할 수 있는 실전 가이드를 JSON 스키마에 맞춰 한국어로 작성합니다.',
     prompt,
-    providerOptions: zaiProviderOptions,
   });
 
   return {
-    verificationRules: buildVerificationRules(object),
-    customGuidelines: buildCustomGuidelines(object),
-    output: object,
+    verificationRules: buildVerificationRules(output),
+    customGuidelines: buildCustomGuidelines(output),
+    output,
   };
 }
 

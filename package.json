@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/Kevinatkorea/Marketing_One#readme",
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.69",
     "@ai-sdk/gateway": "^3.0.82",
     "@ai-sdk/openai-compatible": "^2.0.40",
     "@upstash/redis": "^1.37.0",
