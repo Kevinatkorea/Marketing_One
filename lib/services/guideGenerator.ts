@@ -31,11 +31,6 @@ const GuideOutputSchema = z.object({
   forbiddenKeywords: z
     .array(z.string())
     .describe('사용 금지 키워드 (경쟁사 브랜드명, 과장 광고 표현 등)'),
-  minLength: z.number().int().describe('본문 최소 글자수. 300 이상이어야 함.'),
-  minRequiredKeywordMatch: z
-    .number()
-    .int()
-    .describe('requiredKeywords 중 몇 개 이상 포함되어야 하는지. 1 이상.'),
   blogStructure: z
     .array(z.string())
     .describe('블로그 글 구성 단계별 가이드 (예: ["1. 인트로 — 문제 제기", "2. 본문 — 해결책 소개", ...])'),
@@ -98,7 +93,15 @@ ${projectNotesSection}${notesSection}
 
 // --- 검증 룰 매핑 -------------------------------------------------------
 
+// 검증 룰 기본값 — LLM이 스키마로 숫자를 고르지 않도록 코드에서 고정
+const DEFAULT_MIN_LENGTH = 500;
+const DEFAULT_MIN_KEYWORD_MATCH = 3;
+
 function buildVerificationRules(output: GuideOutput): VerificationRule[] {
+  const minKeywordMatch = Math.min(
+    DEFAULT_MIN_KEYWORD_MATCH,
+    Math.max(1, output.requiredKeywords.length)
+  );
   return [
     {
       ruleId: 'required_keywords',
@@ -107,7 +110,7 @@ function buildVerificationRules(output: GuideOutput): VerificationRule[] {
       isAutoFail: false,
       config: {
         keywords: output.requiredKeywords,
-        minMatch: output.minRequiredKeywordMatch,
+        minMatch: minKeywordMatch,
       },
     },
     {
@@ -125,7 +128,7 @@ function buildVerificationRules(output: GuideOutput): VerificationRule[] {
       weight: 20,
       isAutoFail: false,
       config: {
-        minLength: output.minLength,
+        minLength: DEFAULT_MIN_LENGTH,
         requirePurchaseLink: false,
       },
     },
