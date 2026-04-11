@@ -62,7 +62,7 @@ export const createGuideSchema = z.object({
   productId: z.string().min(1, 'Product ID is required'),
   version: z.string().max(50).optional().default('1.0'),
   verificationRules: z.array(verificationRuleSchema).optional().default([]),
-  customGuidelines: z.string().max(5000).optional().default(''),
+  customGuidelines: z.string().max(20000).optional().default(''),
   isTemplate: z.boolean().optional().default(false),
 });
 
@@ -70,8 +70,32 @@ export const updateGuideSchema = z.object({
   productId: z.string().min(1).optional(),
   version: z.string().max(50).optional(),
   verificationRules: z.array(verificationRuleSchema).optional(),
-  customGuidelines: z.string().max(5000).optional(),
+  customGuidelines: z.string().max(20000).optional(),
   isTemplate: z.boolean().optional(),
+});
+
+// --- Project Info ---
+
+const competitorSchema = z.object({
+  name: z.string().min(1).max(200),
+  keywords: z.array(z.string().max(100)).max(50).optional().default([]),
+});
+
+export const projectInfoSchema = z.object({
+  categoryL1: z.string().min(1, '카테고리 대분류는 필수입니다').max(50),
+  categoryL2: z.string().max(100).optional().default(''),
+  ownDescription: z.string().min(10, '자사 설명은 최소 10자 이상이어야 합니다').max(3000),
+  coreKeywords: z
+    .array(z.string().min(1).max(100))
+    .min(1, '핵심 키워드는 최소 1개 이상 입력하세요')
+    .max(50),
+  competitors: z.array(competitorSchema).max(30).optional().default([]),
+  additionalNotes: z.string().max(3000).optional().default(''),
+});
+
+export const generateGuideSchema = z.object({
+  productId: z.string().min(1, '제품 ID는 필수입니다'),
+  additionalNotes: z.string().max(2000).optional(),
 });
 
 // --- Viral ---

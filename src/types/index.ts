@@ -4,6 +4,21 @@
 
 // --- Project ---
 
+export interface Competitor {
+  name: string;
+  keywords: string[];
+}
+
+export interface ProjectInfo {
+  categoryL1: string;          // 예: "자동차"
+  categoryL2: string;          // 예: "전기차"
+  ownDescription: string;      // 자사 제품/서비스 설명
+  coreKeywords: string[];      // 프로젝트 핵심 키워드
+  competitors: Competitor[];   // 경쟁사 + 경쟁사별 키워드
+  additionalNotes?: string;    // 향후 추가된 사항 (free text)
+  updatedAt: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -12,6 +27,7 @@ export interface Project {
   updatedAt: string;
   status: 'active' | 'archived';
   owner: string;
+  projectInfo?: ProjectInfo;
 }
 
 // --- Product (상품/서비스) ---

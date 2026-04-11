@@ -2,6 +2,10 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import dotenv from 'dotenv'
+
+// dev 플러그인에서 Vercel Functions가 process.env를 읽어야 하므로 .env.local을 먼저 로드한다
+dotenv.config({ path: path.resolve('.env.local') })
 
 /**
  * Vite 플러그인: Vercel Functions를 로컬에서 실행

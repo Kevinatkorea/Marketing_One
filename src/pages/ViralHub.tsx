@@ -2,8 +2,10 @@ import { useState } from 'react';
 import GuideManagement from './GuideManagement';
 import ViralManagement from './ViralManagement';
 import BulkRegistration from './BulkRegistration';
+import ProjectInfoPage from './ProjectInfo';
 
 const tabs = [
+  { key: 'info', label: '프로젝트정보' },
   { key: 'viral', label: '바이럴 관리' },
   { key: 'guides', label: '가이드 관리' },
   { key: 'bulk', label: '바이럴 등록' },
@@ -12,7 +14,7 @@ const tabs = [
 type TabKey = (typeof tabs)[number]['key'];
 
 export default function ViralHub() {
-  const [activeTab, setActiveTab] = useState<TabKey>('viral');
+  const [activeTab, setActiveTab] = useState<TabKey>('info');
 
   return (
     <div className="space-y-6">
@@ -36,6 +38,7 @@ export default function ViralHub() {
       </div>
 
       {/* Tab Content */}
+      {activeTab === 'info' && <ProjectInfoPage />}
       {activeTab === 'viral' && <ViralManagement />}
       {activeTab === 'guides' && <GuideManagement />}
       {activeTab === 'bulk' && <BulkRegistration />}

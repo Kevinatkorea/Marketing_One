@@ -46,3 +46,34 @@ export function cloneGuide(projectId: string, guideId: string): Promise<Guide> {
 export function deleteGuide(projectId: string, guideId: string): Promise<void> {
   return del<void>(`/projects/${projectId}/guides/${guideId}`);
 }
+
+/** AI 자동 생성 응답 — 새로 저장된 Guide + 프리뷰에 쓸 원본 AI 출력 */
+export interface GenerateGuideResponse {
+  guide: Guide;
+  preview: {
+    title: string;
+    summary: string;
+    targetAudience: string;
+    toneAndManner: string;
+    requiredKeywords: string[];
+    forbiddenKeywords: string[];
+    minLength: number;
+    minRequiredKeywordMatch: number;
+    blogStructure: string[];
+    sampleHooks: string[];
+    competitorDifferentiation: string;
+    doList: string[];
+    dontList: string[];
+  };
+}
+
+export function generateGuide(
+  projectId: string,
+  productId: string,
+  additionalNotes?: string,
+): Promise<GenerateGuideResponse> {
+  return post<GenerateGuideResponse>(`/projects/${projectId}/guides/generate`, {
+    productId,
+    ...(additionalNotes ? { additionalNotes } : {}),
+  });
+}

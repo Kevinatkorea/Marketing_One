@@ -26,7 +26,13 @@ import {
   updateViralSchema,
   bulkTextSchema,
   adMappingConfigSchema,
+  projectInfoSchema,
+  generateGuideSchema,
 } from '../../../lib/validations.js';
+import {
+  generateGuideFromProjectInfo,
+  buildGuideDraft,
+} from '../../../lib/services/guideGenerator.js';
 import {
   parseBody,
   errorResponse,
@@ -95,6 +101,32 @@ async function handleProject(request: Request, pid: string): Promise<Response> {
 }
 
 // ---------------------------------------------------------------------------
+// Project Info  (/api/projects/:pid/project-info)
+// ---------------------------------------------------------------------------
+
+async function handleProjectInfo(request: Request, pid: string): Promise<Response> {
+  const project = await projectRepo.findById(pid);
+  if (!project) return errorResponse('Project not found', 404);
+
+  if (method(request) === 'GET') {
+    return jsonResponse(project.projectInfo ?? null);
+  }
+  if (method(request) === 'PUT') {
+    const body = await parseBody(request);
+    const parsed = projectInfoSchema.safeParse(body);
+    if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
+    const updated = await projectRepo.update(pid, {
+      projectInfo: {
+        ...parsed.data,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    return jsonResponse(updated.projectInfo ?? null);
+  }
+  return errorResponse('Method not allowed', 405);
+}
+
+// ---------------------------------------------------------------------------
 // Products  (/api/projects/:pid/products[/:id])
 // ---------------------------------------------------------------------------
 
@@ -140,6 +172,11 @@ async function handleProducts(request: Request, pid: string, subPath: string[]):
 async function handleGuides(request: Request, pid: string, subPath: string[]): Promise<Response> {
   const guideId = subPath[1];
   const action = subPath[2]; // e.g., 'clone'
+
+  // Action: AI 자동 생성 — /guides/generate (no guideId)
+  if (guideId === 'generate' && method(request) === 'POST') {
+    return handleGenerateGuide(request, pid);
+  }
 
   if (!guideId) {
     if (method(request) === 'GET') {
@@ -195,6 +232,43 @@ async function handleGuides(request: Request, pid: string, subPath: string[]): P
     return jsonResponse({ message: '삭제 완료' });
   }
   return errorResponse('Method not allowed', 405);
+}
+
+// --- AI 자동 가이드 생성 ---
+
+async function handleGenerateGuide(request: Request, pid: string): Promise<Response> {
+  const body = await parseBody(request);
+  const parsed = generateGuideSchema.safeParse(body);
+  if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
+
+  const project = await projectRepo.findById(pid);
+  if (!project) return errorResponse('Project not found', 404);
+  if (!project.projectInfo) {
+    return errorResponse("먼저 '프로젝트정보' 탭에서 정보를 입력하세요", 400);
+  }
+
+  const product = await productRepo.findById(parsed.data.productId);
+  if (!product) return errorResponse('Product not found', 404);
+  if (product.projectId !== pid) {
+    return errorResponse('Product does not belong to this project', 400);
+  }
+
+  try {
+    const payload = await generateGuideFromProjectInfo(
+      project.projectInfo,
+      product,
+      parsed.data.additionalNotes,
+    );
+    const draft = buildGuideDraft(pid, product.id, payload);
+    const guide = await guideRepo.create(draft);
+    return jsonResponse({ guide, preview: payload.output }, 201);
+  } catch (err) {
+    console.error('[guides/generate] AI generation failed:', err);
+    return errorResponse(
+      `AI 가이드 생성 실패: ${err instanceof Error ? err.message : String(err)}`,
+      500,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -983,6 +1057,7 @@ async function route(request: Request): Promise<Response> {
     const resource = subPath[0]; // products, guides, virals, dashboard, or undefined
 
     if (!resource) return handleProject(request, pid);
+    if (resource === 'project-info') return handleProjectInfo(request, pid);
     if (resource === 'products') return handleProducts(request, pid, subPath);
     if (resource === 'guides') return handleGuides(request, pid, subPath);
     if (resource === 'virals') return handleVirals(request, pid, subPath);
