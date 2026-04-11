@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   fetchGuides,
@@ -20,6 +20,70 @@ const DEFAULT_RULES: VerificationRule[] = [
   { ruleId: 'content_structure', name: '콘텐츠 구조', weight: 15, isAutoFail: false, config: { requireImages: true, requirePurchaseLink: false, minLength: 500 } },
   { ruleId: 'naver_policy', name: '네이버 광고 정책', weight: 10, isAutoFail: true, config: { policyVersion: '2026-03' } },
 ];
+
+function extractGuideTitle(md: string): string {
+  if (!md) return '';
+  const firstLine = md.split('\n').find((l) => l.trim().length > 0) || '';
+  return firstLine.replace(/^#+\s*/, '').trim();
+}
+
+function renderMarkdownGuide(md: string): ReactNode {
+  const lines = md.split('\n');
+  const nodes: ReactNode[] = [];
+  let bullets: string[] = [];
+  let para: string[] = [];
+  let key = 0;
+
+  const flushBullets = () => {
+    if (bullets.length === 0) return;
+    nodes.push(
+      <ul key={`ul-${key++}`} className="list-disc ml-5 space-y-1 text-sm text-zinc-300">
+        {bullets.map((b, i) => <li key={i}>{b}</li>)}
+      </ul>
+    );
+    bullets = [];
+  };
+
+  const flushPara = () => {
+    if (para.length === 0) return;
+    nodes.push(
+      <p key={`p-${key++}`} className="text-sm text-zinc-300 leading-relaxed">
+        {para.join(' ')}
+      </p>
+    );
+    para = [];
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (line.startsWith('# ')) {
+      flushBullets(); flushPara();
+      nodes.push(
+        <h1 key={`h1-${key++}`} className="text-xl font-bold text-zinc-100 mt-2 mb-3">
+          {line.slice(2)}
+        </h1>
+      );
+    } else if (line.startsWith('## ')) {
+      flushBullets(); flushPara();
+      nodes.push(
+        <h2 key={`h2-${key++}`} className="text-base font-semibold text-emerald-400 mt-5 mb-2">
+          {line.slice(3)}
+        </h2>
+      );
+    } else if (line.startsWith('- ')) {
+      flushPara();
+      bullets.push(line.slice(2));
+    } else if (line.trim() === '') {
+      flushBullets(); flushPara();
+    } else {
+      flushBullets();
+      para.push(line);
+    }
+  }
+  flushBullets(); flushPara();
+
+  return <div className="space-y-1">{nodes}</div>;
+}
 
 function extractFormFromGuide(guide: Guide) {
   const reqRule = guide.verificationRules.find((r) => r.ruleId === 'required_keywords');
@@ -50,6 +114,7 @@ export default function GuideManagement() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<Guide | null>(null);
+  const [viewTarget, setViewTarget] = useState<Guide | null>(null);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [addingProduct, setAddingProduct] = useState(false);
@@ -305,10 +370,14 @@ export default function GuideManagement() {
                     key={guide.id}
                     className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
                   >
-                    <td className="py-3 px-3 sm:px-5 text-zinc-200 font-medium max-w-[140px] sm:max-w-none truncate">
+                    <td
+                      className="py-3 px-3 sm:px-5 text-zinc-200 font-medium max-w-[240px] sm:max-w-[360px] truncate cursor-pointer hover:text-emerald-400 transition-colors"
+                      onClick={() => setViewTarget(guide)}
+                      title="클릭하여 가이드 보기"
+                    >
                       <span className="flex items-center gap-1.5">
                         {guide.pdfFileName && <span className="text-red-400 shrink-0" title={guide.pdfFileName}>📄</span>}
-                        {guide.customGuidelines || guide.id}
+                        {extractGuideTitle(guide.customGuidelines || '') || guide.id}
                       </span>
                     </td>
                     <td className="py-3 px-2 sm:px-4 text-zinc-400 hidden sm:table-cell">{productName(guide.productId)}</td>
@@ -733,13 +802,65 @@ export default function GuideManagement() {
         </div>
       )}
 
+      {/* Guide View Modal */}
+      {viewTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setViewTarget(null)}>
+          <div
+            className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-3xl shadow-2xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start px-6 py-4 border-b border-zinc-800">
+              <div>
+                <div className="text-xs text-zinc-500 mb-0.5">
+                  {productName(viewTarget.productId)} · v{viewTarget.version}
+                </div>
+                <div className="text-sm text-zinc-300 font-medium">
+                  {extractGuideTitle(viewTarget.customGuidelines || '') || '가이드'}
+                </div>
+              </div>
+              <button
+                onClick={() => setViewTarget(null)}
+                className="text-zinc-500 hover:text-zinc-200 shrink-0 ml-4"
+                aria-label="닫기"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 5l10 10M15 5L5 15" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-6 py-5 flex-1">
+              {viewTarget.customGuidelines
+                ? renderMarkdownGuide(viewTarget.customGuidelines)
+                : <p className="text-sm text-zinc-500 italic">가이드 내용이 없습니다.</p>}
+            </div>
+
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-zinc-800">
+              <button
+                onClick={() => handleDownloadPdf(viewTarget)}
+                disabled={downloadingPdf === viewTarget.id}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg"
+              >
+                {downloadingPdf === viewTarget.id ? 'PDF 생성 중...' : 'PDF 다운로드'}
+              </button>
+              <button
+                onClick={() => setViewTarget(null)}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeleteTarget(null)}>
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 sm:p-6 w-full max-w-sm mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-bold text-zinc-100 mb-2">가이드 삭제</h3>
             <p className="text-sm text-zinc-300 mb-5">
-              <span className="font-semibold text-zinc-100">"{deleteTarget.customGuidelines || deleteTarget.id}"</span> 가이드를 삭제하시겠습니까?
+              <span className="font-semibold text-zinc-100">"{extractGuideTitle(deleteTarget.customGuidelines || '') || deleteTarget.id}"</span> 가이드를 삭제하시겠습니까?
             </p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">취소</button>
